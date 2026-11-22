@@ -3,6 +3,7 @@
 // NOTHING here is real: prices, times, hotels, guides and visa rules are made up
 // so the screens have something to show. Same search = same results, so testing is repeatable.
 
+// every city we support. lat/lng is only used for the rough flight distance
 const CITIES = [
   { code: 'AUH', name: 'Abu Dhabi', country: 'United Arab Emirates', lat: 24.45, lon: 54.38, tz: 4, cost: 1.0,
     areas: ['Corniche', 'Saadiyat', 'Yas Island', 'Al Reem'],
@@ -61,6 +62,7 @@ function seeded(text) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
+// random item from a list using the seeded random
 function pick(r, arr) { return arr[Math.floor(r() * arr.length)] }
 
 function getCity(code) { return CITIES.find(c => c.code === code) }
@@ -73,6 +75,7 @@ function distanceKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(x))
 }
 
+// minutes since midnight -> "14:05"
 function toClock(mins) {
   mins = ((mins % 1440) + 1440) % 1440
   return String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0')
@@ -138,6 +141,7 @@ function genFlights(from, to, leave, ret, pax, cabin) {
 const STAY_WORDS = ['Garden', 'Harbour', 'Lantern', 'Blue Door', 'Palm', 'Courtyard', 'Loft', 'Corner', 'Atlas', 'Cedar', 'Willow', 'North Star']
 const AMENITIES = ['Wi-Fi', 'Breakfast', 'Pool', 'Gym', 'Kitchen', 'Airport shuttle', 'Laundry', 'Air conditioning']
 
+// how many nights between two dates
 function nightsBetween(a, b) {
   if (!a || !b) return 1
   const n = Math.round((new Date(b) - new Date(a)) / 86400000)

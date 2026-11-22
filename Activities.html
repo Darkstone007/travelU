@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- things to do page. activities + adding your own plans -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -23,6 +24,7 @@
         <select id="people"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
     </div>
 
+    <!-- category chips get made by the script -->
     <div class="chips" id="cats" role="group" aria-label="Category"></div>
 
     <div class="count-line">
@@ -37,11 +39,13 @@
       </div>
     </div>
 
+    <!-- activity cards -->
     <div class="result-list" id="list"></div>
 
     <div class="card tint stack">
       <p class="strong">Add your own plan</p>
       <p class="small muted" style="margin-top:-6px">Something not on the list, or just time off. It goes in your calendar.</p>
+      <!-- add your own thing to the calendar (dinner, free time, whatever) -->
       <form class="form" id="ownForm">
         <div class="field"><label for="ownTitle">What</label><input id="ownTitle" required placeholder="e.g. Dinner with cousins, or Free afternoon"></div>
         <div class="grid-2">
@@ -69,6 +73,7 @@
     $('#city').value = param('city')
   }
 
+  // categories, "All" is the default
   const CATS = ['All', 'Sights', 'Culture', 'Food', 'Nightlife', 'Outdoors', 'Shopping']
   let cat = 'All'
   $('#cats').innerHTML = CATS.map(c => `<button type="button" class="chip" aria-pressed="${c === 'All'}" data-c="${c}">${c}</button>`).join('')
@@ -81,11 +86,13 @@
   })
 
   let acts = []
+  // total price for the number of people picked
   function sumOf(a) {
     const n = Number($('#people').value)
     return summarize({ type: 'activity', id: a.id, title: a.title, sub: a.area + ' · ' + a.hours + 'h · ' + plural(n, 'person'), total: a.pp * n, people: n, city: a.city, date: trip ? trip.leave : '' }, { needDate: true })
   }
 
+  // filter by category + price then sort
   function draw() {
     const city = $('#city').value
     if (!city) {
@@ -140,6 +147,7 @@
     })
   })
 
+  // saves a plan into localStorage so it shows on the calendar page
   function addPlan(title, date, time, who) {
     const plans = store.get('plans', [])
     plans.push({ id: uid(), title, date, time, who, tripId: trip ? trip.id : '', city: $('#city').value })

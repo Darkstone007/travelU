@@ -10,12 +10,14 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="account">
+<!-- account page: profile, bookings, ring settings, privacy -->
 <div class="app wide">
   <header class="page-head"><div><h1>Account</h1></div></header>
 
   <main class="screen">
     <div class="two-col">
       <div class="stack" style="gap:16px">
+        <!-- name + home airport -->
         <form class="card stack" id="profile">
           <div class="person"><span class="avatar" id="av" style="width:52px;height:52px;border-radius:26px;font-size:20px">?</span><div><p class="strong" id="pName" style="font-size:17px">Add your name</p><p class="small muted" id="pInfo"></p></div></div>
           <div class="grid-2">
@@ -27,6 +29,7 @@
 
         <div id="bookings">
           <div class="section-title"><h2>My bookings</h2></div>
+          <!-- upcoming / past / cancelled -->
           <div class="segmented" id="bFilter" role="group" aria-label="Filter bookings" style="margin-top:10px">
             <button type="button" aria-pressed="true" data-f="up">Confirmed</button>
             <button type="button" aria-pressed="false" data-f="cancel">Cancelled</button>
@@ -43,6 +46,7 @@
           <div style="flex:1"><p class="strong" style="font-size:18px">TravelU Ring</p><p class="small on-dark" id="ringStatus"></p></div>
           <button class="btn compact secondary" type="button" id="pairBtn"></button>
         </div>
+        <!-- smart ring stuff (part of our concept, its all pretend) -->
         <div class="card" id="ringFns"></div>
         <div class="card">
           <p class="small strong muted" style="margin-bottom:4px">Buzz patterns · tap to test</p>
@@ -57,6 +61,7 @@
         </div>
 
         <div class="section-title"><h2>Privacy and sharing</h2></div>
+        <!-- privacy toggles + reset all data -->
         <div class="card" id="privacy"></div>
 
         <div class="section-title"><h2>Demo</h2></div>

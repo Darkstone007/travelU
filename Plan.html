@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="plan">
+<!-- plan tab. basically a menu of everything you can book -->
 <div class="app">
   <header class="page-head">
     <div>
@@ -18,12 +19,14 @@
   </header>
 
   <main class="screen">
+    <!-- pick which trip youre planning for (optional) -->
     <div class="field" id="tripPick" hidden>
       <label for="tripSel">Planning for</label>
       <select id="tripSel"></select>
       <p class="note">Pick a trip and searches fill in its dates and people. Leave it on "Just me" to book on its own.</p>
     </div>
 
+    <!-- links to each booking page, they get ?trip= added by the script -->
     <div class="stack" id="links">
       <a class="row-link" data-page="Flights.html"><span class="icon-tile"><i data-icon="plane" class="lg"></i></span><div><p class="title">Flights</p><p class="small muted">Search, compare and book</p></div><i data-icon="next"></i></a>
       <a class="row-link" data-page="Accomdations.html"><span class="icon-tile"><i data-icon="bed" class="lg"></i></span><div><p class="title">Stays</p><p class="small muted">Hotels, hostels, apartments</p></div><i data-icon="next"></i></a>
@@ -60,6 +63,7 @@
     // still need the select to exist for setLinks
     $('#tripSel').innerHTML = '<option value=""></option>'
   }
+  // redo the links whenever the trip changes
   $('#tripSel').addEventListener('change', setLinks)
   setLinks()
 </script>

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- tour guides page -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -23,6 +24,7 @@
         <select id="people"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
     </div>
 
+    <!-- any / group / private -->
     <div class="segmented" id="kind" role="group" aria-label="Tour type">
       <button type="button" aria-pressed="true" data-k="">All</button>
       <button type="button" aria-pressed="false" data-k="group">Group</button>
@@ -37,6 +39,7 @@
       </div>
     </div>
 
+    <!-- guide cards -->
     <div class="result-list" id="list"></div>
     <p class="note">Sample guides. Names and prices are made up.</p>
   </main>
@@ -52,6 +55,7 @@
   if (trip) $('#people').value = Math.min(6, trip.travellers)
   $('#lang').innerHTML += LANGS.map(l => `<option>${l}</option>`).join('')
 
+  // '' means show both group and private
   let kind = ''
   $('#kind').addEventListener('click', e => {
     const b = e.target.closest('button')
@@ -68,6 +72,7 @@
     return g.priv ? g.pp * Math.max(1, n - 3) * 2 : g.pp * n
   }
 
+  // filter on type + language then sort
   function draw() {
     const city = $('#city').value
     if (!city) { $('#list').innerHTML = '<div class="empty">Choose a city to see guides.</div>'; $('#count').textContent = ''; return }

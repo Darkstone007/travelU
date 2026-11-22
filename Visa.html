@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="trip">
+<!-- visa + prep page. visa rules are fake!! just for the demo -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="javascript:history.back()" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -23,11 +24,13 @@
           <div class="field"><label for="passport">Your passport</label><select id="passport"></select></div>
           <div class="field"><label for="dest">Going to</label><select id="dest"></select></div>
         </div>
+        <!-- visa result card goes here -->
         <div id="result"></div>
       </div>
 
       <div class="stack" style="gap:16px">
         <h2 style="font-size:17px;font-weight:800">Trip checklist</h2>
+        <!-- trip checklist goes here -->
         <div id="checkBox"></div>
       </div>
     </div>
@@ -36,15 +39,18 @@
 
 <script src="data.js"></script>
 <script src="app.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   $('#passport').innerHTML = '<option value="">Select your passport</option>' + PASSPORTS.map(p => `<option>${p}</option>`).join('')
   fillCities($('#dest'), 'Select a destination', false)
   $('#passport').value = store.get('passport', '')
 
+  // default to the trip in the url, or the first trip
   const trips = getTrips()
   let tripId = getTrip(param('trip')) ? param('trip') : (trips[0] ? trips[0].id : '')
   if (getTrip(tripId) && getTrip(tripId).to) $('#dest').value = getTrip(tripId).to
 
+  // looks up the (made up) visa rule for passport + country
   function drawVisa() {
     store.set('passport', $('#passport').value)
     const city = getCity($('#dest').value)
@@ -79,6 +85,7 @@
     })
   }
 
+  // checklist for the chosen trip, with a progress bar
   function drawChecklist() {
     if (!trips.length) {
       $('#checkBox').innerHTML = '<div class="empty small">Checklists come with a trip. <a href="index.html">Start one</a> if you want a shared list.</div>'
@@ -108,6 +115,7 @@
       </div>`
   }
 
+  // ticking an item
   $('#checkBox').addEventListener('change', e => {
     if (e.target.id === 'tripSel') {
       tripId = e.target.value
@@ -119,6 +127,7 @@
       drawChecklist(); drawVisa()
     }
   })
+  // delete buttons + the offline switch
   $('#checkBox').addEventListener('click', e => {
     const d = e.target.closest('[data-del]')
     if (d) { updateTrip(tripId, t => t.checklist.splice(Number(d.dataset.del), 1)); drawChecklist() }
@@ -129,6 +138,7 @@
       toast(on ? 'Saved for offline' : 'Offline copy removed')
     }
   })
+  // adding a new checklist item
   $('#checkBox').addEventListener('submit', e => {
     e.preventDefault()
     updateTrip(tripId, t => t.checklist.push({ text: $('#newItem').value.trim(), done: false }))

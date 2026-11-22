@@ -9,7 +9,9 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="home">
+<!-- home page. first thing you see, shows your trips + whats next -->
 <div class="app">
+  <!-- greeting at the top, name gets filled in by the script -->
   <header class="page-head">
     <div>
       <h1 id="hello">Hi there</h1>
@@ -28,6 +30,7 @@
       </div>
     </form>
 
+    <!-- the 4 big shortcut buttons (each one a different colour now) -->
     <div class="quick">
       <a href="Flights.html"><i data-icon="plane"></i>Flights</a>
       <a href="Accomdations.html"><i data-icon="bed"></i>Stays</a>
@@ -35,14 +38,17 @@
       <a href="index.html"><i data-icon="plus"></i>New trip</a>
     </div>
 
+    <!-- trips list - first trip shows as the boarding pass card -->
     <div class="section-title"><h2>Your trips</h2><a class="small strong" href="index.html">New trip</a></div>
     <div id="trips" class="stack"></div>
 
+    <!-- hidden unless theres something to do (visa, votes etc) -->
     <div id="attentionBox" hidden>
       <div class="section-title"><h2>Needs your attention</h2></div>
       <div id="attention" class="stack" style="margin-top: 10px"></div>
     </div>
 
+    <!-- only confirmed bookings show here -->
     <div class="section-title"><h2>Upcoming bookings</h2><a class="small strong" href="Account.html#bookings">See all</a></div>
     <div id="bookings" class="stack"></div>
   </main>
@@ -64,8 +70,10 @@
   })
 
   // ---- trips ----
+  // sort so the soonest trip is first, trips with no date go to the end
   const trips = getTrips().sort((a, b) => (a.leave || '9') < (b.leave || '9') ? -1 : 1)
 
+  // builds the boarding pass html for one trip. the 5 dots are the trip steps
   function passCard(t) {
     const from = getCity(t.from), to = getCity(t.to)
     const steps = tripProgress(t)
@@ -97,6 +105,7 @@
     </a>`
   }
 
+  // empty state vs actual trips
   if (!trips.length) {
     $('#trips').innerHTML = `<div class="empty">
       <p class="strong" style="color:var(--navy)">No trips yet</p>
@@ -113,6 +122,7 @@
   }
 
   // ---- things to sort out ----
+  // go through every trip and collect stuff that still needs doing
   let todo = ''
   trips.forEach(t => {
     const left = t.checklist.filter(c => !c.done)
@@ -132,6 +142,7 @@
 
   // ---- bookings ----
   const upcoming = getBookings().filter(b => b.status === 'Confirmed').sort((a, b) => (a.date || '') < (b.date || '') ? -1 : 1).slice(0, 4)
+  // which icon goes with which booking type
   const icons = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
   $('#bookings').innerHTML = upcoming.length
     ? upcoming.map(b => `<a class="row-link" href="Account.html#bookings"><span class="icon-tile sm">${icon(icons[b.type] || 'ticket')}</span><div><p class="strong">${esc(b.title)}</p><p class="small muted">${b.date ? fmtDate(b.date, true) + ' · ' : ''}${b.code}</p></div>${icon('next')}</a>`).join('')

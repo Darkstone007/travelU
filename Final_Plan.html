@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="trip">
+<!-- final plan - picks the winner of each type and lets you book it all -->
 <div class="app">
   <header class="top">
     <a class="icon-btn" href="Trip.html" id="backBtn" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -16,6 +17,7 @@
   </header>
 
   <main class="screen">
+    <!-- trip picker -->
     <div class="field" id="pickBox"><label for="tripSel">Trip</label><select id="tripSel"></select></div>
     <div id="content" class="stack" style="gap:16px"></div>
   </main>
@@ -24,6 +26,7 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="booking.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
   const typeName = { flight: 'Flight', stay: 'Stay', tour: 'Tour', activity: 'Activity', package: 'Package', transport: 'Transport' }
@@ -46,6 +49,7 @@
     return opts.slice().sort((a, b) => Object.keys(b.votes || {}).length - Object.keys(a.votes || {}).length || a.total - b.total)[0]
   }
 
+  // one card per type with the chosen option
   function draw() {
     const t = getTrip($('#tripSel').value)
     if (!t) return

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- flight search page -->
 <div class="app">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -22,11 +23,13 @@
       <select id="useTrip"></select>
     </div>
 
+    <!-- return / one way toggle -->
     <div class="segmented" id="tripType" role="group" aria-label="Trip type">
       <button type="button" aria-pressed="true" data-v="return">Return</button>
       <button type="button" aria-pressed="false" data-v="oneway">One way</button>
     </div>
 
+    <!-- search form, submits to Flights_Results.html with everything in the url -->
     <form class="form" id="search" action="Flights_Results.html">
       <div class="grid-2" style="position:relative">
         <div class="field"><label for="from">From</label><select id="from" name="from" required></select></div>
@@ -55,6 +58,7 @@
 
     <div class="section-title"><h2>Ideas from Abu Dhabi</h2></div>
     <p class="small muted" style="margin-top:-8px">Cheapest return a month from now, 1 traveller.</p>
+    <!-- route ideas from abu dhabi so the page isnt empty -->
     <div class="result-list" id="ideas"></div>
   </main>
 </div>
@@ -89,6 +93,7 @@
     $('#tripPick').hidden = false
     fillTrips($('#useTrip'), "Don't use a trip")
   }
+  // copy the trips from/to/dates into the form
   function useTrip(t) {
     $('#tripId').value = t ? t.id : ''
     if (!t) return

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="trip">
+<!-- single trip page. no ?id in the url = list of all trips instead -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="Trip.html" aria-label="Back" id="backBtn"><i data-icon="back" class="lg"></i></a>
@@ -16,12 +17,14 @@
     <button class="icon-btn filled" id="editBtn" type="button" aria-label="Edit trip" hidden><i data-icon="edit"></i></button>
   </header>
 
+  <!-- everything inside main gets built by the script -->
   <main class="screen" id="main"></main>
 </div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="booking.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   const id = param('id')
   const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
@@ -39,6 +42,7 @@
     $('#main').innerHTML = `<div class="stack">${html}</div><a class="btn" href="index.html">${icon('plus')}Start a trip</a>`
   }
 
+  // the actual trip page: summary, people, saved options, bookings
   function showTrip() {
     const t = getTrip(id)
     const dest = getCity(t.to), from = getCity(t.from)
@@ -150,6 +154,7 @@
     }
   })
 
+  // popup for inviting people (link is fake)
   function inviteModal() {
     const t = getTrip(id)
     const m = openModal(`

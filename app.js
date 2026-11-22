@@ -24,6 +24,7 @@ const param = (name) => new URLSearchParams(location.search).get(name) || ''
 const uid = () => Math.random().toString(36).slice(2, 9)
 const money = (n) => '$' + Math.round(n).toLocaleString('en-US')
 
+// dates are stored as yyyy-mm-dd strings, this makes them readable. T12 so timezones dont move the day
 function fmtDate(iso, withDay) {
   if (!iso) return ''
   const d = new Date(iso + 'T12:00:00')
@@ -36,6 +37,7 @@ function addDays(iso, n) {
   d.setDate(d.getDate() + n)
   return d.toISOString().slice(0, 10)
 }
+// escape stuff before putting it in innerHTML (names people type etc)
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
@@ -123,6 +125,7 @@ const MORE = {
   ]
 }
 
+// builds the nav: bottom tabs on phone, sidebar on laptop. same html, css does the rest
 function renderNav() {
   const active = document.body.dataset.tab
   const page = location.pathname.split('/').pop() || 'Home.html'
@@ -145,7 +148,7 @@ function renderNav() {
   nav.className = 'tabbar'
   nav.setAttribute('aria-label', 'Main')
   nav.innerHTML = `
-    <a class="brand" href="Home.html">TravelU</a>
+    <a class="brand" href="Home.html">Travel<span>U</span></a>
     <button class="more-btn" type="button" aria-expanded="false">All pages ${icon('up', 'sm')}</button>
     <div class="tabs">${tabs}</div>
     <div class="side-more">${more}</div>`
@@ -212,6 +215,7 @@ function toast(msg) {
 
 // ---------- trips ----------
 // a trip is optional. you can book everything without one.
+// ---------- trips ----------
 function getTrips() { return store.get('trips', []) }
 function saveTrips(list) { store.set('trips', list) }
 function getTrip(id) { return getTrips().find(t => t.id === id) }
@@ -230,6 +234,7 @@ function deleteTrip(id) {
   store.set('bookings', getBookings().map(b => b.tripId === id ? { ...b, tripId: '' } : b))
 }
 
+// makes a new trip with a default checklist and saves it
 function newTrip(info) {
   const dest = getCity(info.to)
   const me = getName() || 'You'
@@ -292,6 +297,7 @@ function summarize(item, extra = {}) {
   return Object.assign({ type: item.type, id: item.id, title: item.title, sub: item.sub || '', total: item.total || 0, people: item.people || 1, date: item.date || '', city: item.city || '', raw: item }, extra)
 }
 
+// saves a flight/stay/etc onto a trip so people can vote on it
 function addToTrip(tripId, summary) {
   let added = false
   updateTrip(tripId, t => {
@@ -469,5 +475,6 @@ function scene(seed) {
 }
 
 // runs on every page
+// run on every page
 renderNav()
 fillIcons()

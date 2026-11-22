@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="trip">
+<!-- calendar - one day at a time, everything booked or planned -->
 <div class="app">
   <header class="top">
     <a class="icon-btn" href="Trip.html" aria-label="Back" id="backBtn"><i data-icon="back" class="lg"></i></a>
@@ -19,6 +20,7 @@
   <main class="screen">
     <div class="field"><label for="src">Show</label><select id="src"></select></div>
 
+    <!-- day picker strip -->
     <div class="days" id="days" role="group" aria-label="Pick a day"></div>
 
     <div class="flags">
@@ -28,8 +30,10 @@
     </div>
 
     <h2 id="dayTitle" style="font-size:17px;font-weight:800"></h2>
+    <!-- the timeline for the picked day -->
     <div class="timeline" id="timeline"></div>
 
+    <!-- quick add form at the bottom -->
     <form class="card tint stack" id="addForm">
       <p class="strong">Add to this day</p>
       <div class="field"><label for="pTitle">What</label><input id="pTitle" required placeholder="Plan, reservation or free time"></div>
@@ -66,6 +70,7 @@
     return books.concat(plans)
   }
 
+  // which days to show in the strip
   function dayRange() {
     const t = getTrip($('#src').value)
     if (t && t.leave && t.ret) {
@@ -79,6 +84,7 @@
     return Array.from({ length: 14 }, (_, i) => addDays(start, i))
   }
 
+  // redraws the days + the timeline
   function draw() {
     const t = getTrip($('#src').value)
     $('#backBtn').href = t ? 'Trip.html?id=' + t.id : 'Home.html'

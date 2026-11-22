@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- flight results. filters on the left (laptop) or in a dropdown (phone) -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="Flights.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -24,6 +25,7 @@
     </div>
 
     <!-- cheaper on another day? -->
+    <!-- the strip of nearby dates with prices, clicking one re-searches -->
     <div class="days" id="dates" role="group" aria-label="Nearby dates"></div>
 
     <div class="results-layout">
@@ -76,6 +78,7 @@
             </select>
           </label>
         </div>
+        <!-- cards get drawn in here -->
         <div class="result-list" id="list"></div>
         <p class="note">Sample flights. Prices and times are made up for the prototype.</p>
       </div>
@@ -101,6 +104,7 @@
     start()
   }
 
+  // runs once we know the search is valid
   function start() {
     $('#sumRoute').textContent = getCity(q.from).name + ' → ' + getCity(q.to).name
     $('#sumInfo').textContent = fmtDate(q.leave) + (q.ret ? ' – ' + fmtDate(q.ret) : ', one way') + ' · ' + plural(q.pax, 'traveller') + ' · ' + q.cabin
@@ -121,6 +125,7 @@
     const names = [...new Set(flights.map(f => f.airline))].sort()
     $('#airlines').innerHTML = names.map(a => `<label class="check-row"><input type="checkbox" name="airline" value="${a}" checked> ${a}</label>`).join('')
 
+    // filters + sorts then redraws the cards. gets called on every filter change
     function draw() {
       $('#maxLabel').textContent = money($('#maxPrice').value)
       const stops = $$('input[name=stops]:checked').map(i => Number(i.value))

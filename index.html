@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="trip">
+<!-- new trip page (index because its the main "start planning" page) -->
 <div class="app">
   <header class="page-head">
     <div>
@@ -18,7 +19,9 @@
   </header>
 
   <main class="screen">
+    <!-- the whole trip form. nothing here is required except where theyre going -->
     <form class="form" id="tripForm">
+      <!-- only asks your name if we dont have it yet -->
       <div class="field" id="meField" hidden>
         <label for="me">Your name</label>
         <input id="me" placeholder="So your friends know who invited them">
@@ -76,6 +79,7 @@
 
 <script src="data.js"></script>
 <script src="app.js"></script>
+<!-- page script. data.js and app.js have to load before this -->
 <script>
   fillCities($('#from'), 'Select a city or airport')
   fillCities($('#to'), 'Select a destination')
@@ -97,6 +101,7 @@
     $('#trav').value = trav
     showBudget()
   })
+  // shows the total budget for everyone under the per person box
   function showBudget() {
     const b = Number($('#budget').value)
     $('#budgetTotal').textContent = b ? 'Total ' + money(b * trav) : ''
@@ -105,6 +110,7 @@
 
   // invite list
   let invites = []
+  // redraws the little list of people you invited
   function drawInvites() {
     $('#invites').innerHTML = invites.map((n, i) => `
       <div class="person card" style="padding:8px 10px">

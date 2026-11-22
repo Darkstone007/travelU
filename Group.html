@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="group">
+<!-- group page. voting on options + splitting money -->
 <div class="app wide">
   <header class="page-head">
     <div>
@@ -18,6 +19,7 @@
   </header>
 
   <main class="screen" id="main">
+    <!-- trip picker -->
     <div class="field" id="pickBox">
       <label for="tripSel">Trip</label>
       <select id="tripSel"></select>
@@ -28,6 +30,7 @@
 
 <script src="data.js"></script>
 <script src="app.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
   const typeName = { flight: 'Flights', stay: 'Stays', tour: 'Tours', activity: 'Activities', package: 'Packages', transport: 'Transport' }
@@ -45,6 +48,7 @@
     draw()
   }
 
+  // whole page gets redrawn when anything changes, easier than updating bits
   function draw() {
     const t = getTrip($('#tripSel').value)
     if (!t) { $('#content').innerHTML = ''; return }

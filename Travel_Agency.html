@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="menu.css">
 </head>
 <body data-tab="plan">
+<!-- packages page (flight + hotel together). shows if the package is actually cheaper -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -16,6 +17,7 @@
   </header>
 
   <main class="screen">
+    <!-- package search -->
     <form class="form card" id="search">
       <div class="grid-2">
         <div class="field"><label for="from">From</label><select id="from" required></select></div>
@@ -31,6 +33,7 @@
 
     <div class="card tint" style="display:flex;gap:10px"><i data-icon="info"></i><p class="small"><b>How we compare:</b> each package is checked against booking the exact same flight and stay on their own, with known fees included. Sometimes separate is cheaper, and we say so.</p></div>
 
+    <!-- package cards -->
     <div class="result-list" id="list"></div>
   </main>
 </div>
@@ -38,10 +41,12 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="booking.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   fillCities($('#from'), 'Select a city')
   fillCities($('#to'), 'Select a destination')
   $('#leave').min = todayISO()
+  // return date cant be before leaving
   $('#leave').addEventListener('change', () => { $('#ret').min = addDays($('#leave').value, 1) })
 
   const trip = getTrip(param('trip'))
@@ -51,8 +56,10 @@
     $('#pax').value = Math.min(4, trip.travellers)
   }
 
+  // filled in by find()
   let packages = []
 
+  // makes packages from the 2 best flights x 2 best stays
   function find() {
     const from = $('#from').value, to = $('#to').value, leave = $('#leave').value, ret = $('#ret').value
     const pax = Number($('#pax').value)
@@ -75,6 +82,7 @@
     packages.sort((a, b) => (a.price - a.separate) - (b.price - b.separate))
 
     $('#list').innerHTML = packages.map(p => {
+      // positive = package saves money, negative = booking separately is cheaper
       const diff = p.separate - p.price
       return `<article class="card">
         <div class="result-head"><h3>${esc(p.f.airline)} + ${esc(p.s.name)}</h3></div>
@@ -101,6 +109,7 @@
     total: p.price, people: p.pax, date: p.f.leave, city: p.f.to
   }))
 
+  // stop the form reloading the page
   $('#search').addEventListener('submit', e => { e.preventDefault(); find() })
   if (trip && trip.from && trip.to && trip.leave && trip.ret) find()
   else $('#list').innerHTML = '<div class="empty">Search a route to see packages.</div>'

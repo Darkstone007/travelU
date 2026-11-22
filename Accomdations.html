@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- stays search page (yes accomdations is spelt wrong, its in all the links now so leaving it) -->
 <div class="app">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -17,11 +18,13 @@
   </header>
 
   <main class="screen">
+    <!-- optional - fill dates from a trip -->
     <div class="field" id="tripPick" hidden>
       <label for="useTrip">Fill in from a trip (optional)</label>
       <select id="useTrip"></select>
     </div>
 
+    <!-- search form -> Accomdation_Results.html -->
     <form class="form" id="search" action="Accomdation_Results.html">
       <div class="field"><label for="city">Where</label><select id="city" name="city" required></select></div>
       <div class="grid-2">
@@ -37,6 +40,7 @@
       </div>
       <div class="field">
         <span class="label">Type of stay</span>
+        <!-- hotel / hostel / apartment etc, can pick more than one -->
         <div class="chips" role="group" aria-label="Type of stay" id="types">
           <button type="button" class="chip" aria-pressed="true" data-v="Hotel">Hotel</button>
           <button type="button" class="chip" aria-pressed="true" data-v="Hostel">Hostel</button>
@@ -51,6 +55,7 @@
 
     <div class="section-title"><h2>Popular cities</h2></div>
     <p class="small muted" style="margin-top:-8px">Cheapest night next month, 2 guests.</p>
+    <!-- cheap city ideas underneath -->
     <div class="result-list" id="ideas"></div>
   </main>
 </div>
@@ -61,6 +66,7 @@
   fillCities($('#city'), 'Select a destination', false)
   $('#in').min = todayISO()
 
+  // shows "5 nights" under the dates
   function showNights() {
     const a = $('#in').value, b = $('#out').value
     $('#nights').textContent = a && b && b > a ? plural(nightsBetween(a, b), 'night') : ''
@@ -83,6 +89,7 @@
     $('#tripPick').hidden = false
     fillTrips($('#useTrip'), "Don't use a trip")
   }
+  // same as flights, take the trip dates
   function useTrip(t) {
     $('#tripId').value = t ? t.id : ''
     if (!t) return
@@ -108,6 +115,7 @@
     $('#typesVal').value = picked.join(',')
   })
 
+  // ideas use a stay a month from now so theres always a price
   const a = addDays(todayISO(), 30), b = addDays(todayISO(), 35)
   $('#ideas').innerHTML = ['DXB', 'LHR', 'CDG', 'IST', 'HND', 'CPT'].map(code => {
     const cheapest = Math.min(...genStays(code, a, b, 2).map(s => s.night))

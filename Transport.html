@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- getting around. compares ways to get from the airport to your area -->
 <div class="app">
   <header class="top">
     <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -24,11 +25,13 @@
     <div class="field"><label for="people">People</label>
       <select id="people"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
 
+    <!-- cheapest / fastest toggle -->
     <div class="segmented" id="sortBy" role="group" aria-label="Sort routes">
       <button type="button" aria-pressed="true" data-s="price">Cheapest</button>
       <button type="button" aria-pressed="false" data-s="time">Fastest</button>
     </div>
 
+    <!-- route cards -->
     <div class="stack" id="list"></div>
 
     <div class="card tint stack">
@@ -49,6 +52,7 @@
   if (trip && trip.to) $('#city').value = trip.to
   if (trip) $('#people').value = Math.min(6, trip.travellers)
 
+  // fills the "going to" dropdown with areas in that city
   function fillAreas() {
     const c = getCity($('#city').value)
     if (!c) { $('#area').innerHTML = '<option value="">Pick a city first</option>'; return }
@@ -58,6 +62,7 @@
       c.areas.map(a => `<option>${esc(a)}</option>`).join('')
   }
 
+  // default is cheapest first
   let sortBy = 'price'
   $('#sortBy').addEventListener('click', e => {
     const b = e.target.closest('button')
@@ -70,6 +75,7 @@
   let routes = []
   const priceFor = r => r.mode === 'Taxi' || r.mode === 'Ride-hail' ? r.price * Math.ceil(Number($('#people').value) / 4) : r.price * Number($('#people').value)
 
+  // works out cheapest / fastest so we can tag them, then draws
   function draw() {
     const city = $('#city').value
     if (!city) { $('#list').innerHTML = '<div class="empty">Choose a city.</div>'; return }

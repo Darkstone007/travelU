@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="trip">
+<!-- map page. the map is a drawn svg, not a real map (no api key needed) -->
 <div class="app wide">
   <header class="top">
     <a class="icon-btn" href="javascript:history.back()" aria-label="Back"><i data-icon="back" class="lg"></i></a>
@@ -25,9 +26,11 @@
     </div>
 
     <div class="two-col">
+      <!-- svg map goes in here -->
       <div class="map-wrap" id="map"></div>
       <div class="stack">
         <div id="info"></div>
+        <!-- list version of the pins (easier on phones + screen readers) -->
         <div class="stack" id="pinList" style="max-height:420px;overflow-y:auto"></div>
       </div>
     </div>
@@ -38,6 +41,7 @@
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="booking.js"></script>
+<!-- this pages own script (data.js + app.js are loaded just above) -->
 <script>
   const trip = getTrip(param('trip'))
   fillCities($('#city'), 'Choose a city', false)
@@ -56,6 +60,7 @@
     draw()
   })
 
+  // ids of stays already saved to a trip, so we can colour those pins
   function mySavedIds() {
     const ids = getBookings().map(b => b.id)
     getTrips().forEach(t => t.saved.forEach(s => ids.push(s.id)))
@@ -116,6 +121,7 @@
     showInfo()
   }
 
+  // info card for whatever pin is selected
   function showInfo() {
     const p = pins.find(x => x.id === current)
     if (!p) { $('#info').innerHTML = '<p class="small muted">Dark pins are things you saved or booked.</p>'; return }

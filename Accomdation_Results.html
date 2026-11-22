@@ -10,7 +10,9 @@
   <link rel="stylesheet" href="filter.css">
 </head>
 <body data-tab="plan">
+<!-- stay results page, works the same way as flight results -->
 <div class="app wide">
+  <!-- back button + title -->
   <header class="top">
     <a class="icon-btn" href="Accomdations.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
     <div><h1>Stay results</h1><p class="sub">Prices are for the whole stay</p></div>
@@ -29,6 +31,7 @@
     </div>
 
     <div class="results-layout">
+      <!-- all the filters. its a details tag so it folds up on phones -->
       <details class="filters" id="filterBox">
         <summary>Filters <i data-icon="down" class="sm"></i></summary>
         <div class="form">
@@ -80,6 +83,7 @@
             </select>
           </label>
         </div>
+        <!-- results go here -->
         <div class="result-list" id="list"></div>
         <p class="note">Sample stays. Names, ratings and prices are made up for the prototype.</p>
       </div>
@@ -87,12 +91,14 @@
   </main>
 </div>
 
+<!-- floating compare button, only shows once you tick 2+ stays -->
 <a class="compare-bar" id="compareBar" href="Compare.html?type=stay" hidden><span>Compare</span><i data-icon="next"></i></a>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script src="booking.js"></script>
 <script>
+  // read the search out of the url
   const city = param('city'), checkin = param('in'), checkout = param('out')
   const guests = Number(param('guests')) || 2
   const wanted = param('types') ? param('types').split(',') : ['Hotel', 'Hostel', 'Apartment', 'Guesthouse']
@@ -100,6 +106,7 @@
   if (!city || !getCity(city) || !checkin) {
     $('.results-layout').innerHTML = '<div class="empty">No search yet. <a href="Accomdations.html">Search for stays</a></div>'
   } else {
+    // fake stays from data.js (same search gives same stays)
     const stays = genStays(city, checkin, checkout, guests)
     $('#sumCity').textContent = getCity(city).name
     $('#sumInfo').textContent = fmtDate(checkin) + ' – ' + fmtDate(checkout) + ' · ' + plural(stays[0].nights, 'night') + ' · ' + plural(guests, 'guest')
@@ -108,11 +115,13 @@
     if (window.innerWidth >= 960) $('#filterBox').open = true
 
     $$('input[name=kind]').forEach(c => { c.checked = wanted.includes(c.value) })
+    // slider max = most expensive night rounded up to 5
     const maxN = Math.ceil(Math.max(...stays.map(s => s.night)) / 5) * 5
     $('#maxNight').min = Math.floor(Math.min(...stays.map(s => s.night)) / 5) * 5
     $('#maxNight').max = maxN
     $('#maxNight').value = maxN
 
+    // apply every filter then sort, then redraw
     function draw() {
       $('#maxLabel').textContent = money($('#maxNight').value)
       const kinds = $$('input[name=kind]:checked').map(i => i.value)
@@ -130,6 +139,7 @@
         return true
       })
 
+      // sorting
       const sort = $('#sort').value
       shown.sort((a, b) => sort === 'rating' ? b.rating - a.rating : sort === 'km' ? a.km - b.km : a.total - b.total)
 
@@ -137,6 +147,7 @@
       $('#list').innerHTML = shown.length ? shown.map(stayCard).join('') : '<div class="empty">Nothing matches. Try turning off a filter.</div>'
     }
 
+    // any change in the filter box redraws straight away
     $('#filterBox').addEventListener('input', draw)
     $('#sort').addEventListener('change', draw)
     $('#resetFilters').addEventListener('click', () => {

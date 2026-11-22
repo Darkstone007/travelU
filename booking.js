@@ -3,6 +3,7 @@
 // you DON'T need a trip to book. adding it to a trip is optional at the end.
 // payment is fake, nothing gets charged (it's a prototype)
 
+// sum = the short summary of what theyre booking (title, price, type...)
 function openBooking(sum, opts = {}) {
   const me = getName()
   const people = sum.people || 1
