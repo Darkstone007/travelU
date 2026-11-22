@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Stays · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app">
+  <header class="top">
+    <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Stays</h1><p class="sub">Hotels, hostels and apartments. A trip is optional.</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="field" id="tripPick" hidden>
+      <label for="useTrip">Fill in from a trip (optional)</label>
+      <select id="useTrip"></select>
+    </div>
+
+    <form class="form" id="search" action="Accomdation_Results.html">
+      <div class="field"><label for="city">Where</label><select id="city" name="city" required></select></div>
+      <div class="grid-2">
+        <div class="field"><label for="in">Check in</label><input id="in" name="in" type="date" required></div>
+        <div class="field"><label for="out">Check out</label><input id="out" name="out" type="date" required></div>
+      </div>
+      <p class="note" id="nights"></p>
+      <div class="grid-2">
+        <div class="field"><label for="guests">Guests</label>
+          <select id="guests" name="guests"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+        <div class="field"><label for="rooms">Rooms</label>
+          <select id="rooms" name="rooms"><option>1</option><option>2</option><option>3</option></select></div>
+      </div>
+      <div class="field">
+        <span class="label">Type of stay</span>
+        <div class="chips" role="group" aria-label="Type of stay" id="types">
+          <button type="button" class="chip" aria-pressed="true" data-v="Hotel">Hotel</button>
+          <button type="button" class="chip" aria-pressed="true" data-v="Hostel">Hostel</button>
+          <button type="button" class="chip" aria-pressed="true" data-v="Apartment">Apartment</button>
+          <button type="button" class="chip" aria-pressed="true" data-v="Guesthouse">Guesthouse</button>
+        </div>
+      </div>
+      <input type="hidden" name="types" id="typesVal">
+      <input type="hidden" name="trip" id="tripId">
+      <button class="btn" type="submit"><i data-icon="search"></i>Search stays</button>
+    </form>
+
+    <div class="section-title"><h2>Popular cities</h2></div>
+    <p class="small muted" style="margin-top:-8px">Cheapest night next month, 2 guests.</p>
+    <div class="result-list" id="ideas"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  fillCities($('#city'), 'Select a destination', false)
+  $('#in').min = todayISO()
+
+  function showNights() {
+    const a = $('#in').value, b = $('#out').value
+    $('#nights').textContent = a && b && b > a ? plural(nightsBetween(a, b), 'night') : ''
+  }
+  $('#in').addEventListener('change', () => {
+    $('#out').min = addDays($('#in').value, 1)
+    if ($('#out').value && $('#out').value <= $('#in').value) $('#out').value = addDays($('#in').value, 1)
+    showNights()
+  })
+  $('#out').addEventListener('change', showNights)
+
+  // type chips
+  $('#types').addEventListener('click', e => {
+    const c = e.target.closest('.chip')
+    if (!c) return
+    c.setAttribute('aria-pressed', c.getAttribute('aria-pressed') !== 'true')
+  })
+
+  if (getTrips().length) {
+    $('#tripPick').hidden = false
+    fillTrips($('#useTrip'), "Don't use a trip")
+  }
+  function useTrip(t) {
+    $('#tripId').value = t ? t.id : ''
+    if (!t) return
+    if (t.to) $('#city').value = t.to
+    if (t.leave) $('#in').value = t.leave
+    if (t.ret) $('#out').value = t.ret
+    $('#guests').value = Math.min(6, t.travellers)
+    showNights()
+  }
+  $('#useTrip').addEventListener('change', () => useTrip(getTrip($('#useTrip').value)))
+  if (param('trip') && getTrip(param('trip'))) {
+    $('#useTrip').value = param('trip')
+    useTrip(getTrip(param('trip')))
+  }
+  if (param('city')) {
+    $('#city').value = param('city'); $('#in').value = param('in'); $('#out').value = param('out')
+    $('#guests').value = param('guests') || 2
+    showNights()
+  }
+
+  $('#search').addEventListener('submit', () => {
+    const picked = $$('#types .chip[aria-pressed=true]').map(c => c.dataset.v)
+    $('#typesVal').value = picked.join(',')
+  })
+
+  const a = addDays(todayISO(), 30), b = addDays(todayISO(), 35)
+  $('#ideas').innerHTML = ['DXB', 'LHR', 'CDG', 'IST', 'HND', 'CPT'].map(code => {
+    const cheapest = Math.min(...genStays(code, a, b, 2).map(s => s.night))
+    const p = new URLSearchParams({ city: code, in: a, out: b, guests: 2 })
+    return `<a class="row-link" href="Accomdation_Results.html?${p}"><span class="icon-tile sm">${icon('bed')}</span><div><p class="strong">${getCity(code).name}</p><p class="small muted">${getCity(code).country}</p></div><p class="strong">from ${money(cheapest)}/night</p></a>`
+  }).join('')
+</script>
+</body>
+</html>

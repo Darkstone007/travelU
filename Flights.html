@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Flights · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app">
+  <header class="top">
+    <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Flights</h1><p class="sub">Search and book. A trip is optional.</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="field" id="tripPick" hidden>
+      <label for="useTrip">Fill in from a trip (optional)</label>
+      <select id="useTrip"></select>
+    </div>
+
+    <div class="segmented" id="tripType" role="group" aria-label="Trip type">
+      <button type="button" aria-pressed="true" data-v="return">Return</button>
+      <button type="button" aria-pressed="false" data-v="oneway">One way</button>
+    </div>
+
+    <form class="form" id="search" action="Flights_Results.html">
+      <div class="grid-2" style="position:relative">
+        <div class="field"><label for="from">From</label><select id="from" name="from" required></select></div>
+        <div class="field"><label for="to">To</label><select id="to" name="to" required></select></div>
+      </div>
+      <button type="button" class="link-btn" id="swap" style="align-self:flex-start">⇄ Swap</button>
+      <div class="grid-2">
+        <div class="field"><label for="leave">Leave</label><input id="leave" name="leave" type="date" required></div>
+        <div class="field" id="retField"><label for="ret">Return</label><input id="ret" name="ret" type="date" required></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label for="pax">Travellers</label>
+          <select id="pax" name="pax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+        <div class="field"><label for="cabin">Cabin</label>
+          <select id="cabin" name="cabin"><option>Economy</option><option>Premium economy</option><option>Business</option></select></div>
+      </div>
+      <input type="hidden" name="trip" id="tripId">
+      <p class="small strong warn-text" id="err" hidden></p>
+      <button class="btn" type="submit"><i data-icon="search"></i>Search flights</button>
+    </form>
+
+    <div id="recentBox" hidden>
+      <div class="section-title"><h2>Recent searches</h2><button class="link-btn small" id="clearRecent" type="button">Clear</button></div>
+      <div class="stack" id="recent" style="margin-top:10px"></div>
+    </div>
+
+    <div class="section-title"><h2>Ideas from Abu Dhabi</h2></div>
+    <p class="small muted" style="margin-top:-8px">Cheapest return a month from now, 1 traveller.</p>
+    <div class="result-list" id="ideas"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  fillCities($('#from'), 'Select a city or airport')
+  fillCities($('#to'), 'Select a destination')
+  $('#leave').min = todayISO()
+  $('#leave').addEventListener('change', () => { $('#ret').min = $('#leave').value })
+
+  // one way hides the return date
+  $('#tripType').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (!b) return
+    $$('#tripType button').forEach(x => x.setAttribute('aria-pressed', x === b))
+    const oneway = b.dataset.v === 'oneway'
+    $('#retField').hidden = oneway
+    $('#ret').required = !oneway
+    if (oneway) $('#ret').value = ''
+  })
+
+  $('#swap').addEventListener('click', () => {
+    const f = $('#from').value
+    $('#from').value = $('#to').value
+    $('#to').value = f
+  })
+
+  // fill from a trip if they have any
+  if (getTrips().length) {
+    $('#tripPick').hidden = false
+    fillTrips($('#useTrip'), "Don't use a trip")
+  }
+  function useTrip(t) {
+    $('#tripId').value = t ? t.id : ''
+    if (!t) return
+    if (t.from) $('#from').value = t.from
+    if (t.to) $('#to').value = t.to
+    if (t.leave) $('#leave').value = t.leave
+    if (t.ret) $('#ret').value = t.ret
+    $('#pax').value = Math.min(6, t.travellers)
+  }
+  $('#useTrip').addEventListener('change', () => useTrip(getTrip($('#useTrip').value)))
+  if (param('trip') && getTrip(param('trip'))) {
+    $('#useTrip').value = param('trip')
+    useTrip(getTrip(param('trip')))
+  }
+
+  // coming back from results with "Edit" puts the old search back
+  if (param('from')) {
+    $('#from').value = param('from')
+    $('#to').value = param('to')
+    $('#leave').value = param('leave')
+    $('#ret').value = param('ret')
+    $('#pax').value = param('pax') || 1
+    $('#cabin').value = param('cabin') || 'Economy'
+    if (!param('ret')) $('#tripType [data-v=oneway]').click()
+  }
+
+  $('#search').addEventListener('submit', e => {
+    if ($('#from').value === $('#to').value) {
+      e.preventDefault()
+      $('#err').textContent = 'Pick two different cities.'
+      $('#err').hidden = false
+      return
+    }
+    // remember the search
+    const recent = store.get('recentFlights', []).filter(r => !(r.from === $('#from').value && r.to === $('#to').value))
+    recent.unshift({ from: $('#from').value, to: $('#to').value, leave: $('#leave').value, ret: $('#ret').value, pax: $('#pax').value, cabin: $('#cabin').value })
+    store.set('recentFlights', recent.slice(0, 4))
+  })
+
+  // recent searches
+  const recent = store.get('recentFlights', [])
+  if (recent.length) {
+    $('#recentBox').hidden = false
+    $('#recent').innerHTML = recent.map(r => {
+      const q = new URLSearchParams(r).toString()
+      return `<a class="row-link" href="Flights_Results.html?${q}"><span class="icon-tile sm">${icon('plane')}</span><div><p class="strong">${getCity(r.from).name} → ${getCity(r.to).name}</p><p class="small muted">${fmtDate(r.leave)}${r.ret ? ' – ' + fmtDate(r.ret) : ', one way'} · ${plural(Number(r.pax), 'traveller')}</p></div>${icon('next')}</a>`
+    }).join('')
+  }
+  $('#clearRecent').addEventListener('click', () => { store.set('recentFlights', []); $('#recentBox').hidden = true })
+
+  // route ideas, cheapest price from the fake data
+  const leave = addDays(todayISO(), 30), ret = addDays(todayISO(), 37)
+  $('#ideas').innerHTML = ['DXB', 'LHR', 'IST', 'PVG', 'HND', 'CPT'].map(code => {
+    const cheapest = Math.min(...genFlights('AUH', code, leave, ret, 1, 'Economy').map(f => f.pp))
+    const q = new URLSearchParams({ from: 'AUH', to: code, leave, ret, pax: 1, cabin: 'Economy' })
+    return `<a class="row-link" href="Flights_Results.html?${q}"><span class="icon-tile sm">${icon('pin')}</span><div><p class="strong">${getCity(code).name}</p><p class="small muted">${fmtDate(leave)} – ${fmtDate(ret)}</p></div><p class="strong">from ${money(cheapest)}</p></a>`
+  }).join('')
+</script>
+</body>
+</html>

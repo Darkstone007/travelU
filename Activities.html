@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Things to do · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Things to do</h1><p class="sub">Book tickets, add to your calendar or save for the group</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="grid-2">
+      <div class="field"><label for="city">City</label><select id="city"></select></div>
+      <div class="field"><label for="people">People</label>
+        <select id="people"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+    </div>
+
+    <div class="chips" id="cats" role="group" aria-label="Category"></div>
+
+    <div class="count-line">
+      <p class="small strong" id="count"></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="small strong">Price
+          <select id="price"><option value="">Any</option><option value="0">Free</option><option value="30">Under $30 each</option><option value="60">Under $60 each</option></select>
+        </label>
+        <label class="small strong">Sort
+          <select id="sort"><option value="">Suggested</option><option value="low">Price: low to high</option><option value="short">Shortest first</option></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="result-list" id="list"></div>
+
+    <div class="card tint stack">
+      <p class="strong">Add your own plan</p>
+      <p class="small muted" style="margin-top:-6px">Something not on the list, or just time off. It goes in your calendar.</p>
+      <form class="form" id="ownForm">
+        <div class="field"><label for="ownTitle">What</label><input id="ownTitle" required placeholder="e.g. Dinner with cousins, or Free afternoon"></div>
+        <div class="grid-2">
+          <div class="field"><label for="ownDate">Date</label><input id="ownDate" type="date" required></div>
+          <div class="field"><label for="ownTime">Time</label><input id="ownTime" type="time"></div>
+        </div>
+        <div class="field"><label for="ownWho">Who</label><select id="ownWho"><option value="shared">Everyone</option><option value="me">Just me</option><option value="free">Free time</option></select></div>
+        <button class="btn" type="submit">Add to calendar</button>
+      </form>
+    </div>
+    <p class="note">Sample activities and prices.</p>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const trip = getTrip(param('trip'))
+  fillCities($('#city'), 'Choose a city', false)
+  if (trip) {
+    if (trip.to) $('#city').value = trip.to
+    $('#people').value = Math.min(6, trip.travellers)
+  } else if (param('city')) {
+    $('#city').value = param('city')
+  }
+
+  const CATS = ['All', 'Sights', 'Culture', 'Food', 'Nightlife', 'Outdoors', 'Shopping']
+  let cat = 'All'
+  $('#cats').innerHTML = CATS.map(c => `<button type="button" class="chip" aria-pressed="${c === 'All'}" data-c="${c}">${c}</button>`).join('')
+  $('#cats').addEventListener('click', e => {
+    const b = e.target.closest('.chip')
+    if (!b) return
+    cat = b.dataset.c
+    $$('#cats .chip').forEach(x => x.setAttribute('aria-pressed', x === b))
+    draw()
+  })
+
+  let acts = []
+  function sumOf(a) {
+    const n = Number($('#people').value)
+    return summarize({ type: 'activity', id: a.id, title: a.title, sub: a.area + ' · ' + a.hours + 'h · ' + plural(n, 'person'), total: a.pp * n, people: n, city: a.city, date: trip ? trip.leave : '' }, { needDate: true })
+  }
+
+  function draw() {
+    const city = $('#city').value
+    if (!city) {
+      $('#list').innerHTML = '<div class="empty">Choose a city to see what there is to do.</div>'
+      $('#count').textContent = ''
+      return
+    }
+    acts = genActivities(city)
+    const n = Number($('#people').value)
+    const price = $('#price').value
+    let shown = acts.filter(a => (cat === 'All' || a.cat === cat) && (price === '' || (price === '0' ? a.pp === 0 : a.pp < Number(price))))
+    if ($('#sort').value === 'low') shown.sort((a, b) => a.pp - b.pp)
+    if ($('#sort').value === 'short') shown.sort((a, b) => a.hours - b.hours)
+
+    $('#count').textContent = shown.length + ' things to do in ' + getCity(city).name
+    $('#list').innerHTML = shown.length ? shown.map(a => `
+      <article class="card">
+        <div class="result-head"><h3>${esc(a.title)}</h3>${flag(a.cat)}</div>
+        <p class="small muted" style="margin-top:4px">${esc(a.area)} · about ${a.hours} hours</p>
+        <p style="margin-top:8px"><span class="price">${a.pp ? money(a.pp * n) : 'Free'}</span> ${a.pp ? '<span class="small muted">' + money(a.pp) + ' each</span>' : ''}</p>
+        <div class="card-actions">
+          <button class="btn secondary compact" type="button" data-cal="${a.id}">${icon('cal', 'sm')} Calendar</button>
+          <button class="btn secondary compact" type="button" data-action="save" data-id="${a.id}">${icon('plus', 'sm')} Save</button>
+          ${a.pp ? `<button class="btn compact" type="button" data-action="book" data-id="${a.id}" ${isBooked(a.id) ? 'disabled' : ''}>${isBooked(a.id) ? 'Booked' : 'Book'}</button>` : ''}
+        </div>
+      </article>`).join('') : '<div class="empty">Nothing in this category. Try another one.</div>'
+  }
+
+  wireCardActions($('#list'), id => acts.find(a => a.id === id), sumOf)
+
+  // add to calendar popup
+  $('#list').addEventListener('click', e => {
+    const b = e.target.closest('[data-cal]')
+    if (!b) return
+    const a = acts.find(x => x.id === b.dataset.cal)
+    const m = openModal(`
+      <div class="modal-head"><h2>Add to calendar</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      <p class="small muted">${esc(a.title)}</p>
+      <form class="form" id="calForm" style="margin-top:12px">
+        <div class="grid-2">
+          <div class="field"><label for="cDate">Date</label><input id="cDate" type="date" required value="${trip ? trip.leave : ''}"></div>
+          <div class="field"><label for="cTime">Time</label><input id="cTime" type="time" value="10:00"></div>
+        </div>
+        <div class="field"><label for="cWho">Who's going</label><select id="cWho"><option value="shared">Everyone</option><option value="me">Just me</option></select></div>
+        <button class="btn" type="submit">Add</button>
+      </form>`)
+    $('#calForm', m).addEventListener('submit', ev => {
+      ev.preventDefault()
+      addPlan(a.title, $('#cDate', m).value, $('#cTime', m).value, $('#cWho', m).value)
+      closeModal()
+      toast('Added to your calendar')
+    })
+  })
+
+  function addPlan(title, date, time, who) {
+    const plans = store.get('plans', [])
+    plans.push({ id: uid(), title, date, time, who, tripId: trip ? trip.id : '', city: $('#city').value })
+    store.set('plans', plans)
+  }
+
+  $('#ownForm').addEventListener('submit', e => {
+    e.preventDefault()
+    addPlan($('#ownTitle').value.trim(), $('#ownDate').value, $('#ownTime').value, $('#ownWho').value)
+    e.target.reset()
+    toast('Added to your calendar')
+  })
+
+  $('#city').addEventListener('change', draw)
+  $('#people').addEventListener('change', draw)
+  $('#price').addEventListener('change', draw)
+  $('#sort').addEventListener('change', draw)
+  draw()
+</script>
+</body>
+</html>

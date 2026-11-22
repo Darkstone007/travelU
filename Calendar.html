@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Calendar · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="trip">
+<div class="app">
+  <header class="top">
+    <a class="icon-btn" href="Trip.html" aria-label="Back" id="backBtn"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Calendar</h1><p class="sub" id="sub">Your bookings and plans, day by day</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="field"><label for="src">Show</label><select id="src"></select></div>
+
+    <div class="days" id="days" role="group" aria-label="Pick a day"></div>
+
+    <div class="flags">
+      <span class="flag"><i data-icon="group" class="sm"></i>Everyone</span>
+      <span class="flag"><i data-icon="user" class="sm"></i>Just me</span>
+      <span class="flag" style="background:#fff;border:1.5px dashed var(--line)">Free time</span>
+    </div>
+
+    <h2 id="dayTitle" style="font-size:17px;font-weight:800"></h2>
+    <div class="timeline" id="timeline"></div>
+
+    <form class="card tint stack" id="addForm">
+      <p class="strong">Add to this day</p>
+      <div class="field"><label for="pTitle">What</label><input id="pTitle" required placeholder="Plan, reservation or free time"></div>
+      <div class="grid-2">
+        <div class="field"><label for="pTime">Time</label><input id="pTime" type="time"></div>
+        <div class="field"><label for="pWho">Who</label><select id="pWho"><option value="shared">Everyone</option><option value="me">Just me</option><option value="free">Free time</option></select></div>
+      </div>
+      <button class="btn" type="submit">Add</button>
+    </form>
+    <a class="btn secondary" href="Activities.html" id="findLink"><i data-icon="ticket"></i>Find things to do</a>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+  $('#src').innerHTML = '<option value="">Everything I have</option>' + getTrips().map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')
+  if (getTrip(param('trip'))) $('#src').value = param('trip')
+
+  let day = ''
+
+  // all the things that happen, for the chosen trip or everything
+  function items() {
+    const tid = $('#src').value
+    const books = getBookings().filter(b => b.status === 'Confirmed' && b.date && (!tid || b.tripId === tid))
+      .map(b => ({ kind: 'booking', date: b.date, time: '', title: b.title, sub: b.code + ' · ' + b.sub, who: 'shared', icon: typeIcon[b.type] }))
+    // stays cover every night, not just the first day
+    getBookings().filter(b => b.type === 'stay' && b.status === 'Confirmed' && (!tid || b.tripId === tid)).forEach(b => {
+      const nights = Number((b.sub.match(/(\d+) night/) || [0, 1])[1])
+      for (let i = 1; i < nights; i++) books.push({ kind: 'booking', date: addDays(b.date, i), time: '', title: 'Staying at ' + b.title, sub: 'Night ' + (i + 1) + ' of ' + nights, who: 'shared', icon: 'bed' })
+    })
+    const plans = store.get('plans', []).filter(p => !tid || p.tripId === tid).map(p => Object.assign({ kind: 'plan' }, p))
+    return books.concat(plans)
+  }
+
+  function dayRange() {
+    const t = getTrip($('#src').value)
+    if (t && t.leave && t.ret) {
+      const out = []
+      for (let d = t.leave; d <= t.ret; d = addDays(d, 1)) out.push(d)
+      return out
+    }
+    // no trip: two weeks from the first thing coming up (or today)
+    const dates = items().map(i => i.date).filter(d => d >= todayISO()).sort()
+    const start = dates[0] || todayISO()
+    return Array.from({ length: 14 }, (_, i) => addDays(start, i))
+  }
+
+  function draw() {
+    const t = getTrip($('#src').value)
+    $('#backBtn').href = t ? 'Trip.html?id=' + t.id : 'Home.html'
+    $('#findLink').href = 'Activities.html' + (t ? '?trip=' + t.id : '')
+    const range = dayRange()
+    if (!range.includes(day)) day = range[0]
+    const all = items()
+
+    $('#days').innerHTML = range.map(d => {
+      const n = all.filter(i => i.date === d).length
+      const dt = new Date(d + 'T12:00:00')
+      return `<button type="button" aria-pressed="${d === day}" data-d="${d}"><span>${dt.toLocaleDateString('en-GB', { weekday: 'short' })}</span><strong>${dt.getDate()}</strong>${n ? '<span style="font-size:10px">● ' + n + '</span>' : ''}</button>`
+    }).join('')
+
+    $('#dayTitle').textContent = fmtDate(day, true)
+    const today = all.filter(i => i.date === day).sort((a, b) => (a.time || '00') < (b.time || '00') ? -1 : 1)
+    $('#timeline').innerHTML = today.length ? today.map(i => `
+      <div class="slot"><time>${i.time || 'All day'}</time>
+        <div class="card ${i.who === 'shared' ? 'shared' : i.who === 'free' ? 'free' : ''}">
+          <div class="person">${i.icon ? icon(i.icon) : ''}<div><p class="strong">${esc(i.title)}</p><p class="small muted">${i.kind === 'plan' ? (i.who === 'me' ? 'Just me' : i.who === 'free' ? 'Nothing planned on purpose' : 'Everyone') : esc(i.sub)}</p></div>
+          ${i.kind === 'plan' ? `<button class="icon-btn" type="button" data-del="${i.id}" aria-label="Delete">${icon('trash')}</button>` : ''}</div>
+        </div></div>`).join('')
+      : '<div class="empty">Nothing on this day. Leave it free or add something.</div>'
+  }
+
+  $('#days').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (b) { day = b.dataset.d; draw() }
+  })
+  $('#timeline').addEventListener('click', e => {
+    const b = e.target.closest('[data-del]')
+    if (!b) return
+    store.set('plans', store.get('plans', []).filter(p => p.id !== b.dataset.del))
+    draw()
+  })
+  $('#addForm').addEventListener('submit', e => {
+    e.preventDefault()
+    const plans = store.get('plans', [])
+    plans.push({ id: uid(), title: $('#pTitle').value.trim(), date: day, time: $('#pTime').value, who: $('#pWho').value, tripId: $('#src').value })
+    store.set('plans', plans)
+    e.target.reset()
+    toast('Added')
+    draw()
+  })
+  $('#src').addEventListener('change', draw)
+  draw()
+</script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Visa and preparation · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="trip">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="javascript:history.back()" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Visa and preparation</h1><p class="sub">Check what you need before you go</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="two-col">
+      <div class="stack" style="gap:16px">
+        <h2 style="font-size:17px;font-weight:800">Visa check</h2>
+        <div class="grid-2">
+          <div class="field"><label for="passport">Your passport</label><select id="passport"></select></div>
+          <div class="field"><label for="dest">Going to</label><select id="dest"></select></div>
+        </div>
+        <div id="result"></div>
+      </div>
+
+      <div class="stack" style="gap:16px">
+        <h2 style="font-size:17px;font-weight:800">Trip checklist</h2>
+        <div id="checkBox"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  $('#passport').innerHTML = '<option value="">Select your passport</option>' + PASSPORTS.map(p => `<option>${p}</option>`).join('')
+  fillCities($('#dest'), 'Select a destination', false)
+  $('#passport').value = store.get('passport', '')
+
+  const trips = getTrips()
+  let tripId = getTrip(param('trip')) ? param('trip') : (trips[0] ? trips[0].id : '')
+  if (getTrip(tripId) && getTrip(tripId).to) $('#dest').value = getTrip(tripId).to
+
+  function drawVisa() {
+    store.set('passport', $('#passport').value)
+    const city = getCity($('#dest').value)
+    if (!$('#passport').value || !city) {
+      $('#result').innerHTML = '<div class="empty small">Pick your passport and where you are going.</div>'
+      return
+    }
+    const v = genVisa($('#passport').value, city.country)
+    const steps = {
+      ok: ['Check your passport is valid for 6 months after you come back.', 'Keep your return ticket handy at the border.'],
+      info: ['Bring your return ticket and hotel booking.', 'Have some cash for the fee at the airport.', 'Check your passport is valid for 6 months.'],
+      warn: ['Read the rule on the official page.', 'Get your passport photo, flight and hotel bookings ready. Your TravelU bookings can be used.', 'Apply, then tick it off in your checklist.']
+    }[v.level]
+    const t = getTrip(tripId)
+    const visaItem = t && t.checklist.find(c => c.visa)
+
+    $('#result').innerHTML = `<div class="card ${v.level === 'warn' ? 'warn' : v.level === 'ok' ? '' : 'tint'}">
+      <p class="tiny strong ${v.level === 'warn' ? 'warn-text' : 'muted'}">${esc($('#passport').value)} passport → ${esc(city.country)}</p>
+      <h3 style="font-size:20px;margin-top:2px">${v.title}</h3>
+      <p class="small" style="margin-top:4px">${v.text}</p>
+      <ol class="small" style="margin:12px 0;padding-left:20px;display:flex;flex-direction:column;gap:6px">${steps.map(s => '<li>' + s + '</li>').join('')}</ol>
+      <p class="small strong ${v.level === 'warn' ? 'warn-text' : ''}">Source: ${esc(city.country)} government visa page · checked ${fmtDate(todayISO())}</p>
+      ${visaItem && !visaItem.done ? `<button class="btn dark compact" style="margin-top:12px" type="button" id="visaDone">${icon('check', 'sm')} Mark visa done for ${esc(t.name)}</button>` : ''}
+    </div>
+    <p class="note">Demo rules, made up for the prototype. Don't use them for a real trip.</p>`
+
+    const btn = $('#visaDone')
+    if (btn) btn.addEventListener('click', () => {
+      updateTrip(tripId, t => { t.checklist.find(c => c.visa).done = true })
+      toast('Visa ticked off. Everyone on the trip can see it.')
+      drawVisa(); drawChecklist()
+    })
+  }
+
+  function drawChecklist() {
+    if (!trips.length) {
+      $('#checkBox').innerHTML = '<div class="empty small">Checklists come with a trip. <a href="index.html">Start one</a> if you want a shared list.</div>'
+      return
+    }
+    const t = getTrip(tripId)
+    const done = t.checklist.filter(c => c.done).length
+    $('#checkBox').innerHTML = `
+      <div class="field"><label for="tripSel">Trip</label><select id="tripSel">${trips.map(x => `<option value="${x.id}" ${x.id === tripId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div style="margin-top:12px">
+        <div class="split small strong"><span>${done} of ${t.checklist.length} done</span><span class="${done < t.checklist.length ? 'warn-text' : 'good'}">${t.checklist.length - done ? (t.checklist.length - done) + ' left' : 'All done'}</span></div>
+        <div class="bar light" style="margin-top:8px"><span style="width:${t.checklist.length ? done / t.checklist.length * 100 : 0}%"></span></div>
+      </div>
+      <div class="stack" style="margin-top:12px">
+        ${t.checklist.map((c, i) => `<div class="check" style="align-items:center">
+          <label class="check-row" style="flex:1"><input type="checkbox" data-tick="${i}" ${c.done ? 'checked' : ''}> <span style="${c.done ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(c.text)}</span></label>
+          <button class="icon-btn" type="button" data-del="${i}" aria-label="Delete">${icon('trash')}</button></div>`).join('')}
+      </div>
+      <form class="inline-form" id="addItem" style="margin-top:12px">
+        <label for="newItem" class="sr-only">New item</label>
+        <input id="newItem" placeholder="Add something to the list" required>
+        <button class="btn compact dark" type="submit">Add</button>
+      </form>
+      <div class="setting card tint" style="margin-top:12px">
+        ${icon('cloud')}<div><p class="strong">Available offline</p><p class="small muted">Keep this list on your phone with no internet</p></div>
+        <button class="switch" type="button" id="offline" aria-pressed="${store.get('prepOffline', false)}" aria-label="Save checklist offline"></button>
+      </div>`
+  }
+
+  $('#checkBox').addEventListener('change', e => {
+    if (e.target.id === 'tripSel') {
+      tripId = e.target.value
+      if (getTrip(tripId).to) $('#dest').value = getTrip(tripId).to
+      drawVisa(); drawChecklist(); return
+    }
+    if (e.target.dataset.tick !== undefined) {
+      updateTrip(tripId, t => { t.checklist[Number(e.target.dataset.tick)].done = e.target.checked })
+      drawChecklist(); drawVisa()
+    }
+  })
+  $('#checkBox').addEventListener('click', e => {
+    const d = e.target.closest('[data-del]')
+    if (d) { updateTrip(tripId, t => t.checklist.splice(Number(d.dataset.del), 1)); drawChecklist() }
+    if (e.target.id === 'offline') {
+      const on = e.target.getAttribute('aria-pressed') !== 'true'
+      store.set('prepOffline', on)
+      e.target.setAttribute('aria-pressed', on)
+      toast(on ? 'Saved for offline' : 'Offline copy removed')
+    }
+  })
+  $('#checkBox').addEventListener('submit', e => {
+    e.preventDefault()
+    updateTrip(tripId, t => t.checklist.push({ text: $('#newItem').value.trim(), done: false }))
+    drawChecklist()
+  })
+
+  $('#passport').addEventListener('change', drawVisa)
+  $('#dest').addEventListener('change', drawVisa)
+  drawVisa()
+  drawChecklist()
+</script>
+</body>
+</html>

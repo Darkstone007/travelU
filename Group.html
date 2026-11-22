@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Group · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="group">
+<div class="app wide">
+  <header class="page-head">
+    <div>
+      <h1>Group</h1>
+      <p class="muted" style="margin-top:4px">Vote on saved options and split what's booked.</p>
+    </div>
+  </header>
+
+  <main class="screen" id="main">
+    <div class="field" id="pickBox">
+      <label for="tripSel">Trip</label>
+      <select id="tripSel"></select>
+    </div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+  const typeName = { flight: 'Flights', stay: 'Stays', tour: 'Tours', activity: 'Activities', package: 'Packages', transport: 'Transport' }
+  let voter = getName() || 'You'
+
+  if (!getTrips().length) {
+    $('#pickBox').hidden = true
+    $('#content').innerHTML = `<div class="empty"><p class="strong" style="color:var(--navy)">No group trips yet</p>
+      <p class="small" style="margin:4px 0 12px">Voting and splitting costs happen inside a trip. Make one and invite people.</p>
+      <a class="btn compact" style="display:inline-flex" href="index.html">Start a trip</a></div>`
+  } else {
+    fillTrips($('#tripSel'), 'Choose a trip')
+    $('#tripSel').value = param('trip') && getTrip(param('trip')) ? param('trip') : getTrips()[0].id
+    $('#tripSel').addEventListener('change', () => { voter = getName() || 'You'; draw() })
+    draw()
+  }
+
+  function draw() {
+    const t = getTrip($('#tripSel').value)
+    if (!t) { $('#content').innerHTML = ''; return }
+    const members = t.members.map(m => m.name)
+    if (!members.includes(voter)) voter = members[0]
+
+    // ---- voting ----
+    let votes = ''
+    if (!t.saved.length) {
+      votes = `<div class="empty small">Nothing to vote on. Save some <a href="Flights.html?trip=${t.id}">flights</a> or <a href="Accomdations.html?trip=${t.id}">stays</a> to this trip first.</div>`
+    } else {
+      const types = [...new Set(t.saved.map(s => s.type))]
+      types.forEach(type => {
+        const opts = t.saved.filter(s => s.type === type)
+        const counts = opts.map(o => Object.keys(o.votes || {}).length)
+        const top = Math.max(...counts)
+        votes += `<p class="group-label" style="margin:14px 0 8px">${typeName[type] || type}</p><div class="stack">`
+        opts.forEach((o, i) => {
+          const who = Object.keys(o.votes || {})
+          const mine = who.includes(voter)
+          const leading = top > 0 && counts[i] === top && counts.filter(c => c === top).length === 1
+          votes += `<div class="card ${leading ? 'leader' : ''}" style="padding:12px 14px">
+            <div class="person"><span class="icon-tile sm">${icon(typeIcon[type] || 'ticket')}</span>
+              <div><p class="strong">${esc(o.title)} ${leading ? flag('Leading', 'ok') : ''}</p><p class="small muted">${esc(o.sub)}</p></div>
+              <p class="strong">${money(o.total)}</p></div>
+            <div class="vote-bar"><span style="width:${Math.round(who.length / members.length * 100)}%"></span></div>
+            <div class="card-actions">
+              <span class="small muted" style="margin-right:auto">${who.length}/${members.length} · ${who.map(esc).join(', ') || 'no votes yet'}</span>
+              <button class="btn secondary compact vote-btn" type="button" aria-pressed="${mine}" data-vote="${o.id}">${icon(mine ? 'check' : 'vote', 'sm')} ${mine ? 'Voted' : 'Vote'}</button>
+            </div>
+          </div>`
+        })
+        votes += '</div>'
+      })
+    }
+
+    // ---- who's voted ----
+    const people = t.members.map(m => {
+      const n = t.saved.filter(s => (s.votes || {})[m.name]).length
+      return `<div class="person"><span class="avatar">${initial(m.name)}</span><div><p class="strong">${esc(m.name)}${m.you ? ' (you)' : ''}</p><p class="small muted">${t.saved.length ? n + ' of ' + t.saved.length + ' voted' : (m.joined || m.you ? 'In the trip' : 'Invited')}</p></div>
+        ${!m.you && t.saved.length && n < t.saved.length ? `<button class="btn secondary compact" type="button" data-remind="${esc(m.name)}">${icon('bell', 'sm')} Remind</button>` : ''}</div>`
+    }).join('')
+
+    // ---- money ----
+    const booked = tripBookings(t.id).filter(b => b.status === 'Confirmed')
+    const total = booked.reduce((s, b) => s + b.total, 0)
+    let money_html = ''
+    if (!booked.length) {
+      money_html = '<div class="empty small">Nothing booked for this trip yet. When you book, you can say who paid and we work out who owes what.</div>'
+    } else {
+      const paid = {}
+      members.forEach(m => paid[m] = 0)
+      booked.forEach(b => { if (paid[b.paidBy] === undefined) paid[b.paidBy] = 0; paid[b.paidBy] += b.total })
+      const share = total / members.length
+
+      // simple settle up: people who paid less pay the people who paid more
+      const bal = Object.keys(paid).map(n => ({ n, v: paid[n] - share }))
+      const owes = bal.filter(b => b.v < -0.5).sort((a, b) => a.v - b.v)
+      const gets = bal.filter(b => b.v > 0.5).sort((a, b) => b.v - a.v)
+      const lines = []
+      owes.forEach(o => {
+        gets.forEach(g => {
+          const amt = Math.min(-o.v, g.v)
+          if (amt > 0.5) { lines.push(`<div class="cost-line"><span><b>${esc(o.n)}</b> pays <b>${esc(g.n)}</b></span><span class="strong">${money(amt)}</span></div>`); o.v += amt; g.v -= amt }
+        })
+      })
+
+      money_html = `<div class="card">
+        ${booked.map(b => `<div class="cost-line" style="align-items:center"><span>${esc(b.title)}<br><span class="small muted">${money(b.total)}</span></span>
+          <label class="small">Paid by <select data-paid="${b.bookingId}" style="height:40px;border:1.5px solid var(--line);border-radius:10px;font:inherit">${members.map(m => `<option ${m === b.paidBy ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label></div>`).join('')}
+        <div class="cost-line total"><span>Total</span><span>${money(total)}</span></div>
+        <p class="small muted">Split evenly: ${money(share)} each</p>
+        <div style="margin-top:8px">${lines.join('') || '<p class="small good strong">Everyone is even.</p>'}</div>
+      </div>`
+    }
+
+    $('#content').innerHTML = `
+      <div class="two-col">
+        <div>
+          <div class="card tint person" style="padding:10px 14px">
+            ${icon('user')}
+            <label for="voterSel" class="strong" style="flex:1">Voting as</label>
+            <select id="voterSel" style="height:44px;border:1.5px solid var(--line);border-radius:12px;font:inherit;padding:0 8px">${members.map(m => `<option ${m === voter ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
+          </div>
+          <p class="note" style="margin-top:6px">Switch person to see how votes from others look (demo).</p>
+          ${votes}
+        </div>
+        <div class="stack" style="gap:16px">
+          <div><div class="section-title"><h2>Who's in</h2><a class="small strong" href="Trip.html?id=${t.id}">Invite</a></div>
+            <div class="stack" style="margin-top:10px">${people}</div></div>
+          <div><div class="section-title"><h2>Who pays what</h2></div><div style="margin-top:10px">${money_html}</div></div>
+          ${t.saved.length ? `<a class="btn" href="Final_Plan.html?trip=${t.id}">See the final plan</a>` : ''}
+        </div>
+      </div>`
+  }
+
+  $('#content').addEventListener('click', e => {
+    const v = e.target.closest('[data-vote]')
+    if (v) {
+      updateTrip($('#tripSel').value, t => {
+        const o = t.saved.find(s => s.id === v.dataset.vote)
+        o.votes = o.votes || {}
+        if (o.votes[voter]) delete o.votes[voter]
+        else o.votes[voter] = true
+      })
+      toast('Vote saved')
+      draw()
+    }
+    const r = e.target.closest('[data-remind]')
+    if (r) toast('Reminder sent to ' + r.dataset.remind + '. Their ring buzzes once, long.')
+  })
+  $('#content').addEventListener('change', e => {
+    if (e.target.id === 'voterSel') { voter = e.target.value; draw() }
+    if (e.target.dataset.paid) {
+      const all = getBookings()
+      all.find(b => b.bookingId === e.target.dataset.paid).paidBy = e.target.value
+      store.set('bookings', all)
+      draw()
+    }
+  })
+</script>
+</body>
+</html>

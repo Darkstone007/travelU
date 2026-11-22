@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>My trips · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="trip">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="Trip.html" aria-label="Back" id="backBtn"><i data-icon="back" class="lg"></i></a>
+    <div><h1 id="title">My trips</h1><p class="sub" id="sub"></p></div>
+    <button class="icon-btn filled" id="editBtn" type="button" aria-label="Edit trip" hidden><i data-icon="edit"></i></button>
+  </header>
+
+  <main class="screen" id="main"></main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const id = param('id')
+  const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+
+  if (!id || !getTrip(id)) listTrips()
+  else showTrip()
+
+  // no trip picked: show them all
+  function listTrips() {
+    $('#backBtn').href = 'Home.html'
+    const trips = getTrips()
+    $('#sub').textContent = trips.length ? plural(trips.length, 'trip') : ''
+    let html = trips.map(t => `<a class="row-link" href="Trip.html?id=${t.id}"><span class="icon-tile">${icon('trip', 'lg')}</span><div><p class="title">${esc(t.name)}</p><p class="small muted">${t.to ? getCity(t.to).name + ' · ' : ''}${t.leave ? fmtDate(t.leave) + ' – ' + fmtDate(t.ret) : 'No dates yet'} · ${plural(t.members.length, 'person')}</p></div>${icon('next')}</a>`).join('')
+    if (!html) html = `<div class="empty"><p class="strong" style="color:var(--navy)">No trips yet</p><p class="small" style="margin-top:4px">Trips are for planning with other people: compare, vote, split costs. You can still book anything without one.</p></div>`
+    $('#main').innerHTML = `<div class="stack">${html}</div><a class="btn" href="index.html">${icon('plus')}Start a trip</a>`
+  }
+
+  function showTrip() {
+    const t = getTrip(id)
+    const dest = getCity(t.to), from = getCity(t.from)
+    $('#title').textContent = t.name
+    $('#sub').textContent = [from && dest ? t.from + ' → ' + t.to : dest ? dest.name : '', t.leave ? fmtDate(t.leave) + ' – ' + fmtDate(t.ret) : '', plural(t.travellers, 'traveller')].filter(Boolean).join(' · ')
+    $('#editBtn').hidden = false
+
+    const booked = tripBookings(id).filter(b => b.status === 'Confirmed')
+    const bookedTotal = booked.reduce((s, b) => s + b.total, 0)
+    // the cheapest saved flight + stay that aren't booked yet, as a guess of what's still to pay
+    const cheapest = type => {
+      if (booked.some(b => b.type === type)) return 0
+      const opts = t.saved.filter(s => s.type === type)
+      return opts.length ? Math.min(...opts.map(s => s.total)) : 0
+    }
+    const estimate = bookedTotal + cheapest('flight') + cheapest('stay')
+    const budgetTotal = t.budget * t.travellers
+    const pct = budgetTotal ? Math.min(100, Math.round(estimate / budgetTotal * 100)) : 0
+    const left = t.checklist.filter(c => !c.done).length
+
+    $('#main').innerHTML = `
+      <div class="two-col">
+        <div class="stack" style="gap:16px">
+          <div class="card dark">
+            <p class="small on-dark strong">Booked ${money(bookedTotal)} · estimated total</p>
+            <p style="margin-top:4px"><span class="big">${money(estimate)}</span> ${budgetTotal ? '<span class="on-dark">of ' + money(budgetTotal) + ' budget</span>' : ''}</p>
+            ${budgetTotal ? `<div class="bar" style="margin-top:14px"><span style="width:${pct}%;${estimate > budgetTotal ? 'background:#E8A33D' : ''}"></span></div>` : ''}
+            <div class="split small" style="margin-top:8px"><span>${money(estimate / Math.max(1, t.travellers))} each</span><span class="on-dark">${budgetTotal ? (estimate > budgetTotal ? money(estimate - budgetTotal) + ' over' : money(budgetTotal - estimate) + ' left') : 'No budget set'}</span></div>
+          </div>
+
+          <div class="tiles">
+            <a class="tile" href="Flights.html?trip=${id}"><span class="icon-tile sm">${icon('plane')}</span><span class="title">Flights</span><span class="status">${t.saved.filter(s => s.type === 'flight').length} saved</span></a>
+            <a class="tile" href="Accomdations.html?trip=${id}"><span class="icon-tile sm">${icon('bed')}</span><span class="title">Stays</span><span class="status">${t.saved.filter(s => s.type === 'stay').length} saved</span></a>
+            <a class="tile" href="Activities.html?trip=${id}"><span class="icon-tile sm">${icon('ticket')}</span><span class="title">Things to do</span><span class="status">${t.saved.filter(s => s.type === 'activity' || s.type === 'tour').length} saved</span></a>
+            <a class="tile ${left ? 'warn' : ''}" href="Visa.html?trip=${id}">${left ? '<span class="corner">' + icon('alert') + '</span>' : ''}<span class="icon-tile sm">${icon('shield')}</span><span class="title">Preparation</span><span class="status">${left ? left + ' to do' : 'All done'}</span></a>
+            <a class="tile" href="Group.html?trip=${id}"><span class="icon-tile sm">${icon('vote')}</span><span class="title">Vote</span><span class="status">${t.saved.length ? plural(t.saved.length, 'option') : 'Nothing to vote on'}</span></a>
+            <a class="tile" href="Calendar.html?trip=${id}"><span class="icon-tile sm">${icon('cal')}</span><span class="title">Calendar</span><span class="status">Day by day</span></a>
+            <a class="tile" href="Maps.html?trip=${id}"><span class="icon-tile sm">${icon('map')}</span><span class="title">Map</span><span class="status">${dest ? dest.name : 'Pick a city'}</span></a>
+            <a class="tile" href="Final_Plan.html?trip=${id}"><span class="icon-tile sm">${icon('done')}</span><span class="title">Final plan</span><span class="status">Book what's agreed</span></a>
+          </div>
+        </div>
+
+        <div class="stack" style="gap:16px">
+          <div class="card">
+            <div class="section-title" style="margin:0 0 10px"><h2>People</h2><button class="btn compact dark" type="button" id="inviteBtn">${icon('plus', 'sm')} Invite</button></div>
+            <div class="stack" id="people"></div>
+          </div>
+
+          <div>
+            <div class="section-title"><h2>Saved options</h2><a class="small strong" href="Group.html?trip=${id}">Vote</a></div>
+            <div class="stack" id="saved" style="margin-top:10px"></div>
+          </div>
+
+          <div>
+            <div class="section-title"><h2>Booked</h2></div>
+            <div class="stack" id="booked" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn danger" type="button" id="deleteTrip">${icon('trash', 'sm')} Delete trip</button>`
+
+    // people
+    $('#people').innerHTML = t.members.map((m, i) => `
+      <div class="person"><span class="avatar">${initial(m.name)}</span><div><p class="strong">${esc(m.name)}${m.you ? ' (you)' : ''}</p><p class="small muted">${m.you ? 'Organiser' : m.joined ? 'Joined' : 'Invited, link sent'}</p></div>
+      ${m.you ? '' : `<button class="icon-btn" type="button" data-kick="${i}" aria-label="Remove ${esc(m.name)}">${icon('x')}</button>`}</div>`).join('')
+
+    // saved options
+    $('#saved').innerHTML = t.saved.length ? t.saved.map(s => `
+      <div class="card" style="padding:12px 14px">
+        <div class="person"><span class="icon-tile sm">${icon(typeIcon[s.type] || 'ticket')}</span><div><p class="strong">${esc(s.title)}</p><p class="small muted">${esc(s.sub)}</p></div><p class="strong">${money(s.total)}</p></div>
+        <div class="card-actions">
+          <span class="small muted" style="margin-right:auto">${plural(Object.keys(s.votes || {}).length, 'vote')}</span>
+          <button class="btn secondary compact" type="button" data-unsave="${s.id}">Remove</button>
+          <button class="btn compact" type="button" data-book="${s.id}" ${isBooked(s.id) ? 'disabled' : ''}>${isBooked(s.id) ? 'Booked' : 'Book'}</button>
+        </div>
+      </div>`).join('')
+      : `<div class="empty small">Nothing saved. Search <a href="Flights.html?trip=${id}">flights</a> or <a href="Accomdations.html?trip=${id}">stays</a> and press "Save to trip".</div>`
+
+    $('#booked').innerHTML = booked.length ? booked.map(b => `<div class="row-link"><span class="icon-tile sm">${icon(typeIcon[b.type] || 'ticket')}</span><div><p class="strong">${esc(b.title)}</p><p class="small muted">${b.code} · paid by ${esc(b.paidBy)}</p></div><p class="strong">${money(b.total)}</p></div>`).join('')
+      : '<div class="empty small">Nothing booked for this trip yet.</div>'
+
+
+    $('#inviteBtn').addEventListener('click', inviteModal)
+    $('#deleteTrip').addEventListener('click', () => {
+      if (confirm('Delete "' + t.name + '"? Your bookings stay in Account.')) {
+        deleteTrip(id)
+        location.href = 'Trip.html'
+      }
+    })
+  }
+
+  // one click handler for the buttons inside the trip page (added once, the html inside changes)
+  $('#main').addEventListener('click', e => {
+    if (!id || !getTrip(id)) return
+    const kick = e.target.closest('[data-kick]')
+    if (kick) {
+      updateTrip(id, t => t.members.splice(Number(kick.dataset.kick), 1))
+      return showTrip()
+    }
+    const un = e.target.closest('[data-unsave]')
+    if (un) {
+      updateTrip(id, t => { t.saved = t.saved.filter(s => s.id !== un.dataset.unsave) })
+      return showTrip()
+    }
+    const bk = e.target.closest('[data-book]')
+    if (bk) {
+      const s = getTrip(id).saved.find(x => x.id === bk.dataset.book)
+      openBooking(s, { tripId: id, onDone: showTrip })
+    }
+  })
+
+  function inviteModal() {
+    const t = getTrip(id)
+    const m = openModal(`
+      <div class="modal-head"><h2>Invite people</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      <form class="inline-form" id="invForm">
+        <label class="sr-only" for="invName">Name or email</label>
+        <input id="invName" placeholder="Name or email" required>
+        <button class="btn compact dark" type="submit">Add</button>
+      </form>
+      <p class="small muted" style="margin:14px 0 6px">Or send the link (demo link):</p>
+      <div class="inline-form">
+        <label class="sr-only" for="linkBox">Invite link</label>
+        <input id="linkBox" value="${inviteLink(t)}" readonly>
+        <button class="btn secondary compact" type="button" id="copy">${icon('copy', 'sm')} Copy</button>
+      </div>
+      <p class="small muted" style="margin-top:10px">Want to see what happens when someone joins? <button class="link-btn small" type="button" id="fakeJoin">Pretend someone joined</button></p>`)
+
+    $('#invForm', m).addEventListener('submit', e => {
+      e.preventDefault()
+      const n = $('#invName', m).value.trim()
+      updateTrip(id, t => { t.members.push({ name: n, invited: true }); if (t.travellers < t.members.length) t.travellers = t.members.length })
+      closeModal()
+      toast('Invite sent to ' + n)
+      showTrip()
+    })
+    $('#copy', m).addEventListener('click', () => {
+      $('#linkBox', m).select()
+      navigator.clipboard.writeText(inviteLink(t)).catch(() => document.execCommand('copy'))
+      toast('Link copied')
+    })
+    // marks the first invited person as joined (just for showing the flow)
+    $('#fakeJoin', m).addEventListener('click', () => {
+      updateTrip(id, t => {
+        const p = t.members.find(x => !x.you && !x.joined)
+        if (p) p.joined = true
+        else t.members.push({ name: 'Guest ' + t.members.length, joined: true })
+      })
+      closeModal()
+      toast('Someone joined your trip')
+      showTrip()
+    })
+  }
+
+  // edit the trip details
+  $('#editBtn').addEventListener('click', () => {
+    const t = getTrip(id)
+    const m = openModal(`
+      <div class="modal-head"><h2>Edit trip</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      <form class="form" id="editForm">
+        <div class="field"><label for="eName">Name</label><input id="eName" value="${esc(t.name)}" required></div>
+        <div class="grid-2">
+          <div class="field"><label for="eFrom">From</label><select id="eFrom"></select></div>
+          <div class="field"><label for="eTo">To</label><select id="eTo"></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label for="eLeave">Leave</label><input id="eLeave" type="date" value="${t.leave}"></div>
+          <div class="field"><label for="eRet">Return</label><input id="eRet" type="date" value="${t.ret}"></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label for="eTrav">Travellers</label><input id="eTrav" type="number" min="1" max="9" value="${t.travellers}"></div>
+          <div class="field"><label for="eBudget">Budget each ($)</label><input id="eBudget" type="number" min="0" value="${t.budget || ''}"></div>
+        </div>
+        <button class="btn" type="submit">Save changes</button>
+      </form>`)
+    fillCities($('#eFrom', m), 'Not set'); fillCities($('#eTo', m), 'Not set')
+    $('#eFrom', m).value = t.from; $('#eTo', m).value = t.to
+    $('#editForm', m).addEventListener('submit', e => {
+      e.preventDefault()
+      updateTrip(id, t => {
+        t.name = $('#eName', m).value.trim()
+        t.from = $('#eFrom', m).value; t.to = $('#eTo', m).value
+        t.leave = $('#eLeave', m).value; t.ret = $('#eRet', m).value
+        t.travellers = Number($('#eTrav', m).value) || 1
+        t.budget = Number($('#eBudget', m).value) || 0
+      })
+      closeModal()
+      toast('Trip updated')
+      showTrip()
+    })
+  })
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Packages · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="plan">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Packages</h1><p class="sub">Flight + stay bundles, checked against booking separately</p></div>
+  </header>
+
+  <main class="screen">
+    <form class="form card" id="search">
+      <div class="grid-2">
+        <div class="field"><label for="from">From</label><select id="from" required></select></div>
+        <div class="field"><label for="to">To</label><select id="to" required></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label for="leave">Leave</label><input id="leave" type="date" required></div>
+        <div class="field"><label for="ret">Return</label><input id="ret" type="date" required></div>
+      </div>
+      <div class="field"><label for="pax">Travellers</label><select id="pax"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <button class="btn" type="submit"><i data-icon="search"></i>Find packages</button>
+    </form>
+
+    <div class="card tint" style="display:flex;gap:10px"><i data-icon="info"></i><p class="small"><b>How we compare:</b> each package is checked against booking the exact same flight and stay on their own, with known fees included. Sometimes separate is cheaper, and we say so.</p></div>
+
+    <div class="result-list" id="list"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  fillCities($('#from'), 'Select a city')
+  fillCities($('#to'), 'Select a destination')
+  $('#leave').min = todayISO()
+  $('#leave').addEventListener('change', () => { $('#ret').min = addDays($('#leave').value, 1) })
+
+  const trip = getTrip(param('trip'))
+  if (trip) {
+    $('#from').value = trip.from; $('#to').value = trip.to
+    $('#leave').value = trip.leave; $('#ret').value = trip.ret
+    $('#pax').value = Math.min(4, trip.travellers)
+  }
+
+  let packages = []
+
+  function find() {
+    const from = $('#from').value, to = $('#to').value, leave = $('#leave').value, ret = $('#ret').value
+    const pax = Number($('#pax').value)
+    if (from === to) { $('#list').innerHTML = '<div class="empty">Pick two different cities.</div>'; return }
+
+    const flights = genFlights(from, to, leave, ret, pax, 'Economy').sort((a, b) => a.stops - b.stops || a.total - b.total).slice(0, 2)
+    const stays = genStays(to, leave, ret, pax).filter(s => s.kind !== 'Hostel').sort((a, b) => b.rating - a.rating).slice(0, 2)
+    const r = seeded('pkg' + from + to + leave + ret)
+
+    packages = []
+    flights.forEach(f => stays.forEach(s => {
+      const flightCost = f.total + f.bagFee * pax
+      const separate = flightCost + s.total
+      const price = Math.round(separate * (0.9 + r() * 0.13))   // sometimes a deal, sometimes not
+      packages.push({
+        id: 'p-' + f.id + '-' + s.id, f, s, separate, price, pax,
+        strict: r() < 0.5   // stricter cancellation than booking separately
+      })
+    }))
+    packages.sort((a, b) => (a.price - a.separate) - (b.price - b.separate))
+
+    $('#list').innerHTML = packages.map(p => {
+      const diff = p.separate - p.price
+      return `<article class="card">
+        <div class="result-head"><h3>${esc(p.f.airline)} + ${esc(p.s.name)}</h3></div>
+        <p class="small muted" style="margin-top:4px">${stopsText(p.f.stops)} flight · ${p.s.kind}, ${esc(p.s.area)} · ${plural(p.s.nights, 'night')} · ${plural(p.pax, 'traveller')}</p>
+        <div class="cost-line" style="margin-top:8px"><span>Package</span><span class="strong">${money(p.price)}</span></div>
+        <div class="cost-line"><span>Same flight + stay booked separately</span><span>${money(p.separate)}</span></div>
+        <div class="cost-line total"><span>${diff >= 0 ? 'You save' : 'Separate is cheaper by'}</span><span class="${diff >= 0 ? 'good' : 'warn-text'}">${money(Math.abs(diff))}</span></div>
+        <div class="flags" style="margin-top:6px">
+          ${p.strict ? flag('Stricter cancellation: whole package non-refundable', 'warn') : flag('Same cancellation as booking separately', 'ok')}
+          ${p.f.bag === 'included' ? flag('Bag included', 'ok') : flag('Bag not included')}
+        </div>
+        <div class="card-actions">
+          <a class="btn secondary compact" href="Flights_Results.html?${new URLSearchParams({ from: p.f.from, to: p.f.to, leave: p.f.leave, ret: p.f.ret, pax: p.pax, cabin: 'Economy' })}">Book separately</a>
+          <button class="btn secondary compact" type="button" data-action="save" data-id="${p.id}">${icon('plus', 'sm')} Save</button>
+          <button class="btn compact" type="button" data-action="book" data-id="${p.id}" ${isBooked(p.id) ? 'disabled' : ''}>${isBooked(p.id) ? 'Booked' : 'Book package'}</button>
+        </div>
+      </article>`
+    }).join('') || '<div class="empty">No packages for this route.</div>'
+  }
+
+  wireCardActions($('#list'), id => packages.find(p => p.id === id), p => summarize({
+    type: 'package', id: p.id, title: p.f.airline + ' + ' + p.s.name,
+    sub: p.f.from + ' → ' + p.f.to + ' · ' + fmtDate(p.f.leave) + ' – ' + fmtDate(p.f.ret) + ' · ' + plural(p.pax, 'traveller'),
+    total: p.price, people: p.pax, date: p.f.leave, city: p.f.to
+  }))
+
+  $('#search').addEventListener('submit', e => { e.preventDefault(); find() })
+  if (trip && trip.from && trip.to && trip.leave && trip.ret) find()
+  else $('#list').innerHTML = '<div class="empty">Search a route to see packages.</div>'
+</script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Transport · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app">
+  <header class="top">
+    <a class="icon-btn" href="Plan.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Transport</h1><p class="sub">From the airport to where you're staying</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="grid-2">
+      <div class="field"><label for="city">City</label><select id="city"></select></div>
+      <div class="field"><label for="area">Going to</label><select id="area"></select></div>
+    </div>
+    <div class="field"><label for="people">People</label>
+      <select id="people"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+
+    <div class="segmented" id="sortBy" role="group" aria-label="Sort routes">
+      <button type="button" aria-pressed="true" data-s="price">Cheapest</button>
+      <button type="button" aria-pressed="false" data-s="time">Fastest</button>
+    </div>
+
+    <div class="stack" id="list"></div>
+
+    <div class="card tint stack">
+      <p class="strong"><i data-icon="nav" class="sm"></i> Ring navigation</p>
+      <p class="small">If navigation cues are on, your ring buzzes for each turn on the walk from the station.</p>
+      <a class="small strong" href="Account.html">Ring settings</a>
+    </div>
+    <p class="note">Times and prices are estimates made up for the prototype.</p>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const trip = getTrip(param('trip'))
+  fillCities($('#city'), 'Choose a city', false)
+  if (trip && trip.to) $('#city').value = trip.to
+  if (trip) $('#people').value = Math.min(6, trip.travellers)
+
+  function fillAreas() {
+    const c = getCity($('#city').value)
+    if (!c) { $('#area').innerHTML = '<option value="">Pick a city first</option>'; return }
+    // if they booked a stay here, put it first
+    const stay = getBookings().find(b => b.type === 'stay' && b.city === c.code && b.status === 'Confirmed')
+    $('#area').innerHTML = (stay ? `<option value="${esc(stay.sub.split(' · ')[1])}">My stay: ${esc(stay.title)}</option>` : '') +
+      c.areas.map(a => `<option>${esc(a)}</option>`).join('')
+  }
+
+  let sortBy = 'price'
+  $('#sortBy').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (!b) return
+    sortBy = b.dataset.s
+    $$('#sortBy button').forEach(x => x.setAttribute('aria-pressed', x === b))
+    draw()
+  })
+
+  let routes = []
+  const priceFor = r => r.mode === 'Taxi' || r.mode === 'Ride-hail' ? r.price * Math.ceil(Number($('#people').value) / 4) : r.price * Number($('#people').value)
+
+  function draw() {
+    const city = $('#city').value
+    if (!city) { $('#list').innerHTML = '<div class="empty">Choose a city.</div>'; return }
+    const area = $('#area').value
+    routes = genTransport(city, area).map(r => Object.assign({}, r, { id: r.id + '-' + city + '-' + area }))
+    routes.sort((a, b) => sortBy === 'time' ? a.mins - b.mins : priceFor(a) - priceFor(b))
+
+    const cheapest = Math.min(...routes.map(priceFor))
+    const fastest = Math.min(...routes.map(r => r.mins))
+    const slowest = Math.max(...routes.map(r => r.mins))
+    const offline = store.get('offline', [])
+
+    $('#list').innerHTML = routes.map(r => {
+      const saved = offline.includes(r.id)
+      return `<article class="card">
+        <div class="person"><span class="icon-tile sm">${icon(r.icon)}</span>
+          <div><h3>${r.mode}</h3><p class="small muted">${r.note}</p></div></div>
+        <div class="split" style="margin-top:12px">
+          <div><p class="tiny muted">Time</p><p class="strong">about ${r.mins} min</p></div>
+          <div style="text-align:right"><p class="tiny muted">Cost for ${$('#people').value}</p><p class="strong">${money(priceFor(r))}</p></div>
+        </div>
+        <div class="bar light" style="margin-top:8px" aria-hidden="true"><span style="width:${Math.round(r.mins / slowest * 100)}%"></span></div>
+        <div class="flags" style="margin-top:10px">
+          ${priceFor(r) === cheapest ? flag('Cheapest', 'ok') : ''}${r.mins === fastest ? flag('Fastest', 'ok') : ''}
+        </div>
+        <div class="card-actions">
+          <button class="btn secondary compact" type="button" data-offline="${r.id}" aria-pressed="${saved}">${icon('cloud', 'sm')} ${saved ? 'Saved offline' : 'Save offline'}</button>
+          ${r.book ? `<button class="btn compact" type="button" data-action="book" data-id="${r.id}" ${isBooked(r.id) ? 'disabled' : ''}>${isBooked(r.id) ? 'Booked' : 'Pre-book'}</button>` : ''}
+        </div>
+      </article>`
+    }).join('')
+  }
+
+  $('#list').addEventListener('click', e => {
+    const b = e.target.closest('[data-offline]')
+    if (!b) return
+    let off = store.get('offline', [])
+    off = off.includes(b.dataset.offline) ? off.filter(x => x !== b.dataset.offline) : off.concat(b.dataset.offline)
+    store.set('offline', off)
+    toast(off.includes(b.dataset.offline) ? 'Saved, works without internet' : 'Removed from offline')
+    draw()
+  })
+  wireCardActions($('#list'), id => routes.find(r => r.id === id), r => summarize({
+    type: 'transport', id: r.id, title: r.mode + ' to ' + $('#area').selectedOptions[0].textContent.replace('My stay: ', ''),
+    sub: getCity($('#city').value).name + ' airport · about ' + r.mins + ' min', total: priceFor(r), people: Number($('#people').value),
+    city: $('#city').value, date: trip ? trip.leave : ''
+  }, { needDate: true }))
+
+  $('#city').addEventListener('change', () => { fillAreas(); draw() })
+  $('#area').addEventListener('change', draw)
+  $('#people').addEventListener('change', draw)
+  fillAreas()
+  draw()
+</script>
+</body>
+</html>

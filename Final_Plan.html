@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Final plan · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="trip">
+<div class="app">
+  <header class="top">
+    <a class="icon-btn" href="Trip.html" id="backBtn" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Final plan</h1><p class="sub">What the group picked, ready to book</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="field" id="pickBox"><label for="tripSel">Trip</label><select id="tripSel"></select></div>
+    <div id="content" class="stack" style="gap:16px"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+  const typeName = { flight: 'Flight', stay: 'Stay', tour: 'Tour', activity: 'Activity', package: 'Package', transport: 'Transport' }
+  let picks = {}   // type -> chosen saved id (if they change it by hand)
+
+  if (!getTrips().length) {
+    $('#pickBox').hidden = true
+    $('#content').innerHTML = '<div class="empty">No trips yet. <a href="index.html">Start a trip</a>, or book things on their own from <a href="Plan.html">Plan</a>.</div>'
+  } else {
+    fillTrips($('#tripSel'), 'Choose a trip')
+    $('#tripSel').value = param('trip') && getTrip(param('trip')) ? param('trip') : getTrips()[0].id
+    $('#tripSel').addEventListener('change', () => { picks = {}; draw() })
+    draw()
+  }
+
+  // booked one wins, then most votes, then cheapest
+  function choose(opts) {
+    const booked = opts.find(o => isBooked(o.id))
+    if (booked) return booked
+    return opts.slice().sort((a, b) => Object.keys(b.votes || {}).length - Object.keys(a.votes || {}).length || a.total - b.total)[0]
+  }
+
+  function draw() {
+    const t = getTrip($('#tripSel').value)
+    if (!t) return
+    $('#backBtn').href = 'Trip.html?id=' + t.id
+    if (!t.saved.length) {
+      $('#content').innerHTML = `<div class="empty">Nothing saved to this trip yet, so there's no plan.<br><a href="Flights.html?trip=${t.id}">Find flights</a> · <a href="Accomdations.html?trip=${t.id}">Find stays</a></div>`
+      return
+    }
+
+    // one pick per type. activities and tours can have more than one so they all go in
+    const chosen = []
+    const types = [...new Set(t.saved.map(s => s.type))]
+    types.forEach(type => {
+      const opts = t.saved.filter(s => s.type === type)
+      if (type === 'activity' || type === 'tour') { opts.forEach(o => chosen.push({ item: o, opts: [o] })); return }
+      const pick = opts.find(o => o.id === picks[type]) || choose(opts)
+      chosen.push({ item: pick, opts })
+    })
+
+    const total = chosen.reduce((s, c) => s + c.item.total, 0)
+    const budget = t.budget * t.travellers
+    const allVoted = t.members.every(m => t.saved.some(s => (s.votes || {})[m.name]))
+    const left = t.checklist.filter(c => !c.done)
+    const notBooked = chosen.filter(c => !isBooked(c.item.id))
+
+    $('#content').innerHTML = `
+      <div>${allVoted ? flag('Everyone has voted', 'ok') : flag('Not everyone has voted yet', 'warn')}</div>
+      <div class="card">
+        <p class="small strong" style="color:var(--blue)">${esc(t.name)}</p>
+        <p><span class="big" style="font-size:34px">${money(total)}</span> <span class="muted">total · ${money(total / t.travellers)} each</span></p>
+        <div style="margin-top:10px">
+          ${chosen.map(c => `<div style="padding:12px 0;border-top:1px solid var(--line)">
+            <div class="person"><span class="icon-tile sm">${icon(typeIcon[c.item.type] || 'ticket')}</span>
+              <div><p class="strong">${esc(c.item.title)}</p><p class="small muted">${esc(c.item.sub)} · ${plural(Object.keys(c.item.votes || {}).length, 'vote')}</p></div>
+              <p class="strong">${money(c.item.total)}</p></div>
+            ${c.opts.length > 1 && !isBooked(c.item.id) ? `<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px">Change ${typeName[c.item.type].toLowerCase()}:
+              <select data-pick="${c.item.type}" style="flex:1;height:40px;border:1.5px solid var(--line);border-radius:10px;font:inherit">${c.opts.map(o => `<option value="${o.id}" ${o.id === c.item.id ? 'selected' : ''}>${esc(o.title)} · ${money(o.total)}</option>`).join('')}</select></label>` : ''}
+            <div class="card-actions" style="border:0;padding-top:4px;margin-top:6px">
+              ${isBooked(c.item.id) ? flag('Booked', 'ok') : `<button class="btn compact" type="button" data-book="${c.item.id}">Book ${typeName[c.item.type].toLowerCase()}</button>`}
+            </div>
+          </div>`).join('')}
+        </div>
+        ${budget ? `<div class="split strong" style="padding-top:12px;border-top:1.5px solid var(--navy)"><span>${total > budget ? 'Over' : 'Under'} budget by</span><span class="${total > budget ? 'warn-text' : 'good'}">${money(Math.abs(budget - total))}</span></div>` : ''}
+      </div>
+      ${left.length ? `<a class="alert-row warn" href="Visa.html?trip=${t.id}">${icon('alert')}<div><p class="strong">${plural(left.length, 'task')} left before you travel</p><p class="small">${esc(left[0].text)}</p></div>${icon('next')}</a>` : ''}
+      <p class="small muted">You pay each seller directly. Check each one's cancellation terms before booking.</p>
+      ${notBooked.length ? `<button class="btn" type="button" id="bookAll">Book everything left · ${money(notBooked.reduce((s, c) => s + c.item.total, 0))}</button>` : flag('Everything in the plan is booked', 'ok')}
+      <a class="btn secondary" href="Group.html?trip=${t.id}">Back to voting</a>`
+
+    // book them one after the other
+    const bookAll = $('#bookAll')
+    if (bookAll) bookAll.addEventListener('click', () => {
+      const queue = notBooked.map(c => c.item)
+      const next = () => {
+        const it = queue.shift()
+        if (!it) { draw(); return }
+        openBooking(it, { tripId: t.id, onDone: () => setTimeout(() => { if (queue.length) { closeModal(); next() } else draw() }, 900) })
+      }
+      next()
+    })
+  }
+
+  $('#content').addEventListener('click', e => {
+    const b = e.target.closest('[data-book]')
+    if (!b) return
+    const t = getTrip($('#tripSel').value)
+    openBooking(t.saved.find(s => s.id === b.dataset.book), { tripId: t.id, onDone: draw })
+  })
+  $('#content').addEventListener('change', e => {
+    if (e.target.dataset.pick) { picks[e.target.dataset.pick] = e.target.value; draw() }
+  })
+</script>
+</body>
+</html>

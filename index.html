@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>New trip · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="trip">
+<div class="app">
+  <header class="page-head">
+    <div>
+      <h1>Start a trip</h1>
+      <p class="muted" style="margin-top: 4px">Enter it once and every search, vote and checklist uses it. Only the name is required.</p>
+    </div>
+  </header>
+
+  <main class="screen">
+    <form class="form" id="tripForm">
+      <div class="field" id="meField" hidden>
+        <label for="me">Your name</label>
+        <input id="me" placeholder="So your friends know who invited them">
+      </div>
+      <div class="field"><label for="name">Trip name</label><input id="name" placeholder="Name your trip" required></div>
+      <div class="grid-2">
+        <div class="field"><label for="from">From</label><select id="from"></select></div>
+        <div class="field"><label for="to">To</label><select id="to"></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label for="leave">Leave</label><input id="leave" type="date"></div>
+        <div class="field"><label for="ret">Return</label><input id="ret" type="date"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <span class="label" id="travLabel">Travellers</span>
+          <div class="stepper" role="group" aria-labelledby="travLabel">
+            <button type="button" data-step="-1" aria-label="Fewer travellers">−</button>
+            <output id="trav">1</output>
+            <button type="button" data-step="1" aria-label="More travellers">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="budget">Budget each ($)</label>
+          <input id="budget" type="number" min="0" step="10" placeholder="Optional">
+          <p class="note" id="budgetTotal"></p>
+        </div>
+      </div>
+
+      <div class="card tint stack">
+        <h2 style="font-size: 15px; font-weight: 800">Invite people (optional)</h2>
+        <div id="invites" class="stack"></div>
+        <div class="inline-form">
+          <label for="inviteName" class="sr-only">Name or email</label>
+          <input id="inviteName" placeholder="Name or email">
+          <button type="button" class="btn dark compact" id="addInvite">Add</button>
+        </div>
+        <p class="small" style="display:flex;gap:8px"><i data-icon="lock" class="sm"></i><span>People on the trip see the plan, saved options and votes. They never see your documents or payment details.</span></p>
+      </div>
+
+      <p class="small strong warn-text" id="formError" hidden></p>
+      <button class="btn" type="submit">Create trip</button>
+    </form>
+
+    <div class="card">
+      <p class="strong">Just want to book?</p>
+      <p class="small muted" style="margin-top:2px">You don't need a trip for that.</p>
+      <div class="btn-row" style="margin-top:12px">
+        <a class="btn secondary compact" href="Flights.html"><i data-icon="plane" class="sm"></i>Flights</a>
+        <a class="btn secondary compact" href="Accomdations.html"><i data-icon="bed" class="sm"></i>Stays</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  fillCities($('#from'), 'Select a city or airport')
+  fillCities($('#to'), 'Select a destination')
+  $('#leave').min = todayISO()
+  if (!getName()) $('#meField').hidden = false
+
+  // return can't be before leave
+  $('#leave').addEventListener('change', () => {
+    $('#ret').min = $('#leave').value
+    if ($('#ret').value && $('#ret').value < $('#leave').value) $('#ret').value = ''
+  })
+
+  // travellers + / -
+  let trav = 1
+  $('.stepper').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (!b) return
+    trav = Math.min(9, Math.max(1, trav + Number(b.dataset.step)))
+    $('#trav').value = trav
+    showBudget()
+  })
+  function showBudget() {
+    const b = Number($('#budget').value)
+    $('#budgetTotal').textContent = b ? 'Total ' + money(b * trav) : ''
+  }
+  $('#budget').addEventListener('input', showBudget)
+
+  // invite list
+  let invites = []
+  function drawInvites() {
+    $('#invites').innerHTML = invites.map((n, i) => `
+      <div class="person card" style="padding:8px 10px">
+        <span class="avatar">${initial(n)}</span>
+        <div><p class="strong">${esc(n)}</p><p class="small muted">Gets the invite link</p></div>
+        <button type="button" class="icon-btn" data-remove="${i}" aria-label="Remove ${esc(n)}">${icon('x')}</button>
+      </div>`).join('')
+  }
+  function addInvite() {
+    const v = $('#inviteName').value.trim()
+    if (!v) return
+    invites.push(v)
+    $('#inviteName').value = ''
+    // a person invited is probably travelling too
+    if (trav < invites.length + 1) { trav = invites.length + 1; $('#trav').value = trav; showBudget() }
+    drawInvites()
+  }
+  $('#addInvite').addEventListener('click', addInvite)
+  $('#inviteName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addInvite() } })
+  $('#invites').addEventListener('click', e => {
+    const b = e.target.closest('[data-remove]')
+    if (b) { invites.splice(Number(b.dataset.remove), 1); drawInvites() }
+  })
+
+  $('#tripForm').addEventListener('submit', e => {
+    e.preventDefault()
+    if ($('#from').value && $('#from').value === $('#to').value) {
+      $('#formError').textContent = 'From and To are the same city.'
+      $('#formError').hidden = false
+      return
+    }
+    if ($('#me').value.trim()) setName($('#me').value)
+
+    const t = newTrip({
+      name: $('#name').value.trim(),
+      from: $('#from').value, to: $('#to').value,
+      leave: $('#leave').value, ret: $('#ret').value,
+      travellers: trav, budget: $('#budget').value,
+      invites
+    })
+
+    // show the (fake) invite link before going to the trip
+    const m = openModal(`
+      <div class="modal-head"><h2>Trip created</h2></div>
+      <p class="muted small">${invites.length ? 'Send this link to ' + invites.join(', ') + '.' : 'Share this link if you want to plan with someone.'} The link is a demo.</p>
+      <div class="inline-form" style="margin-top:12px">
+        <label for="linkBox" class="sr-only">Invite link</label>
+        <input id="linkBox" value="${inviteLink(t)}" readonly>
+        <button class="btn dark compact" type="button" id="copyLink">${icon('copy', 'sm')} Copy</button>
+      </div>
+      <a class="btn" style="margin-top:16px" href="Trip.html?id=${t.id}">Go to my trip</a>`)
+    $('#copyLink', m).addEventListener('click', () => {
+      $('#linkBox', m).select()
+      navigator.clipboard.writeText(inviteLink(t)).catch(() => document.execCommand('copy'))
+      toast('Link copied')
+    })
+  })
+</script>
+</body>
+</html>

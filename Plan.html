@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Plan · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="plan">
+<div class="app">
+  <header class="page-head">
+    <div>
+      <h1>Plan</h1>
+      <p class="muted" style="margin-top:4px">Book anything on its own, or plan it for a trip.</p>
+    </div>
+  </header>
+
+  <main class="screen">
+    <div class="field" id="tripPick" hidden>
+      <label for="tripSel">Planning for</label>
+      <select id="tripSel"></select>
+      <p class="note">Pick a trip and searches fill in its dates and people. Leave it on "Just me" to book on its own.</p>
+    </div>
+
+    <div class="stack" id="links">
+      <a class="row-link" data-page="Flights.html"><span class="icon-tile"><i data-icon="plane" class="lg"></i></span><div><p class="title">Flights</p><p class="small muted">Search, compare and book</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Accomdations.html"><span class="icon-tile"><i data-icon="bed" class="lg"></i></span><div><p class="title">Stays</p><p class="small muted">Hotels, hostels, apartments</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Transport.html"><span class="icon-tile"><i data-icon="bus" class="lg"></i></span><div><p class="title">Transport</p><p class="small muted">Airport to hotel, compare ways to get there</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Activities.html"><span class="icon-tile"><i data-icon="ticket" class="lg"></i></span><div><p class="title">Things to do</p><p class="small muted">Sights, food, nightlife, day trips</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Tour_Guide.html"><span class="icon-tile"><i data-icon="guide" class="lg"></i></span><div><p class="title">Tour guides</p><p class="small muted">Group or private, filter by language</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Travel_Agency.html"><span class="icon-tile"><i data-icon="box" class="lg"></i></span><div><p class="title">Packages</p><p class="small muted">Flight + stay bundles vs booking separately</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Maps.html"><span class="icon-tile"><i data-icon="map" class="lg"></i></span><div><p class="title">Map</p><p class="small muted">Stays and places to go, on a map</p></div><i data-icon="next"></i></a>
+      <a class="row-link" data-page="Visa.html"><span class="icon-tile"><i data-icon="shield" class="lg"></i></span><div><p class="title">Visa check</p><p class="small muted">What your passport needs</p></div><i data-icon="next"></i></a>
+    </div>
+
+    <a class="btn secondary" href="Compare.html"><i data-icon="columns"></i>Compare saved options</a>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  // links get ?trip=... added when a trip is picked
+  function setLinks() {
+    const t = $('#tripSel').value
+    store.set('planFor', t)
+    $$('#links [data-page]').forEach(a => {
+      a.href = a.dataset.page + (t ? '?trip=' + t : '')
+    })
+  }
+
+  if (getTrips().length) {
+    $('#tripPick').hidden = false
+    fillTrips($('#tripSel'), 'Just me, no trip')
+    const last = store.get('planFor', '')
+    if (getTrip(last)) $('#tripSel').value = last
+  } else {
+    // still need the select to exist for setLinks
+    $('#tripSel').innerHTML = '<option value=""></option>'
+  }
+  $('#tripSel').addEventListener('change', setLinks)
+  setLinks()
+</script>
+</body>
+</html>

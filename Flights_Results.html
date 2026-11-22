@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Flight results · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="Flights.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Flight results</h1><p class="sub">Prices are the total for everyone, taxes included</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="search-bar">
+      <i data-icon="plane"></i>
+      <div><p class="strong" id="sumRoute"></p><p class="small" id="sumInfo"></p></div>
+      <a class="small strong" id="editLink" href="Flights.html">Edit</a>
+    </div>
+
+    <!-- cheaper on another day? -->
+    <div class="days" id="dates" role="group" aria-label="Nearby dates"></div>
+
+    <div class="results-layout">
+      <details class="filters" id="filterBox">
+        <summary>Filters <i data-icon="down" class="sm"></i></summary>
+        <div class="form">
+          <div class="field">
+            <span class="label">Stops</span>
+            <label class="check-row"><input type="checkbox" name="stops" value="0" checked> Direct</label>
+            <label class="check-row"><input type="checkbox" name="stops" value="1" checked> 1 stop</label>
+            <label class="check-row"><input type="checkbox" name="stops" value="2" checked> 2 stops</label>
+          </div>
+          <div class="field">
+            <label for="maxPrice">Max price each: <span id="maxLabel"></span></label>
+            <input type="range" id="maxPrice" step="10">
+          </div>
+          <div class="field">
+            <label for="depTime">Leaves</label>
+            <select id="depTime">
+              <option value="">Any time</option>
+              <option value="0-6">Night (00–06)</option>
+              <option value="6-12">Morning (06–12)</option>
+              <option value="12-18">Afternoon (12–18)</option>
+              <option value="18-24">Evening (18–24)</option>
+            </select>
+          </div>
+          <div class="field">
+            <span class="label">Must have</span>
+            <label class="check-row"><input type="checkbox" id="bagOnly"> Bag included</label>
+            <label class="check-row"><input type="checkbox" id="flexOnly"> Free cancellation (Flex)</label>
+            <label class="check-row"><input type="checkbox" id="hideUnknown"> Hide unconfirmed costs</label>
+          </div>
+          <div class="field">
+            <span class="label">Airlines</span>
+            <div id="airlines"></div>
+          </div>
+          <button type="button" class="btn secondary compact" id="resetFilters">Reset filters</button>
+        </div>
+      </details>
+
+      <div class="stack">
+        <div class="count-line">
+          <p class="small strong" id="count"></p>
+          <label class="small strong">Sort
+            <select id="sort">
+              <option value="price">Cheapest</option>
+              <option value="time">Fastest</option>
+              <option value="dep">Earliest</option>
+              <option value="best">Best mix</option>
+            </select>
+          </label>
+        </div>
+        <div class="result-list" id="list"></div>
+        <p class="note">Sample flights. Prices and times are made up for the prototype.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<a class="compare-bar" id="compareBar" href="Compare.html?type=flight" hidden><span>Compare</span><i data-icon="next"></i></a>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const q = {
+    from: param('from'), to: param('to'), leave: param('leave'), ret: param('ret'),
+    pax: Number(param('pax')) || 1, cabin: param('cabin') || 'Economy'
+  }
+
+  if (!q.from || !q.to || !q.leave) {
+    $('.results-layout').innerHTML = '<div class="empty">No search yet. <a href="Flights.html">Search for flights</a></div>'
+    $('#dates').hidden = true
+  } else {
+    start()
+  }
+
+  function start() {
+    $('#sumRoute').textContent = getCity(q.from).name + ' → ' + getCity(q.to).name
+    $('#sumInfo').textContent = fmtDate(q.leave) + (q.ret ? ' – ' + fmtDate(q.ret) : ', one way') + ' · ' + plural(q.pax, 'traveller') + ' · ' + q.cabin
+    $('#editLink').href = 'Flights.html?' + location.search.slice(1)
+
+    // open the filters by default on a laptop
+    if (window.innerWidth >= 960) $('#filterBox').open = true
+
+    drawDates()
+    let flights = genFlights(q.from, q.to, q.leave, q.ret, q.pax, q.cabin)
+
+    // set up price slider and airline boxes from the results
+    // round to 10s so the slider can actually reach the top price
+    const maxPP = Math.ceil(Math.max(...flights.map(f => f.pp)) / 10) * 10
+    $('#maxPrice').min = Math.floor(Math.min(...flights.map(f => f.pp)) / 10) * 10
+    $('#maxPrice').max = maxPP
+    $('#maxPrice').value = maxPP
+    const names = [...new Set(flights.map(f => f.airline))].sort()
+    $('#airlines').innerHTML = names.map(a => `<label class="check-row"><input type="checkbox" name="airline" value="${a}" checked> ${a}</label>`).join('')
+
+    function draw() {
+      $('#maxLabel').textContent = money($('#maxPrice').value)
+      const stops = $$('input[name=stops]:checked').map(i => Number(i.value))
+      const airlines = $$('input[name=airline]:checked').map(i => i.value)
+      const time = $('#depTime').value
+
+      let shown = flights.filter(f => {
+        if (!stops.includes(f.stops)) return false
+        if (!airlines.includes(f.airline)) return false
+        if (f.pp > Number($('#maxPrice').value)) return false
+        if ($('#bagOnly').checked && f.bag !== 'included') return false
+        if ($('#flexOnly').checked && f.fare !== 'Flex') return false
+        if ($('#hideUnknown').checked && f.bag === 'unknown') return false
+        if (time) {
+          const [a, b] = time.split('-').map(Number)
+          const h = Number(f.out.dep.slice(0, 2))
+          if (h < a || h >= b) return false
+        }
+        return true
+      })
+
+      const sort = $('#sort').value
+      const real = f => f.total + f.bagFee * f.pax   // price with the bag if it costs extra
+      const time2 = f => f.out.dur + (f.back ? f.back.dur : 0)
+      shown.sort((a, b) => {
+        if (sort === 'time') return time2(a) - time2(b)
+        if (sort === 'dep') return a.out.dep.localeCompare(b.out.dep)
+        if (sort === 'best') return (real(a) / 100 + time2(a) / 60) - (real(b) / 100 + time2(b) / 60)
+        return real(a) - real(b)
+      })
+
+      $('#count').textContent = shown.length + ' of ' + flights.length + ' flights'
+      $('#list').innerHTML = shown.length ? shown.map(flightCard).join('') : '<div class="empty">No flights match. Try turning off a filter.</div>'
+    }
+
+    $('#filterBox').addEventListener('input', draw)
+    $('#sort').addEventListener('change', draw)
+    $('#resetFilters').addEventListener('click', () => {
+      $$('#filterBox input[type=checkbox]').forEach(c => { c.checked = c.name === 'stops' || c.name === 'airline' })
+      $('#maxPrice').value = maxPP
+      $('#depTime').value = ''
+      draw()
+    })
+
+    wireCardActions($('#list'), id => flights.find(f => f.id === id))
+    draw()
+    updateCompareBar()
+  }
+
+  // the date strip: 3 days either side, with the cheapest price on each day
+  function drawDates() {
+    let html = ''
+    for (let d = -3; d <= 3; d++) {
+      const day = addDays(q.leave, d)
+      if (day < todayISO()) continue
+      const ret = q.ret ? addDays(q.ret, d) : ''
+      const cheap = Math.min(...genFlights(q.from, q.to, day, ret, q.pax, q.cabin).map(f => f.total))
+      const p = new URLSearchParams(Object.assign({}, q, { leave: day, ret }))
+      html += `<button type="button" aria-pressed="${d === 0}" data-href="Flights_Results.html?${p}" style="width:auto;padding:0 12px"><span>${fmtDate(day, true)}</span><strong style="font-size:14px">${money(cheap)}</strong></button>`
+    }
+    $('#dates').innerHTML = html
+    $('#dates').addEventListener('click', e => {
+      const b = e.target.closest('button')
+      if (b) location.href = b.dataset.href
+    })
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Account · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="account">
+<div class="app wide">
+  <header class="page-head"><div><h1>Account</h1></div></header>
+
+  <main class="screen">
+    <div class="two-col">
+      <div class="stack" style="gap:16px">
+        <form class="card stack" id="profile">
+          <div class="person"><span class="avatar" id="av" style="width:52px;height:52px;border-radius:26px;font-size:20px">?</span><div><p class="strong" id="pName" style="font-size:17px">Add your name</p><p class="small muted" id="pInfo"></p></div></div>
+          <div class="grid-2">
+            <div class="field"><label for="name">Name</label><input id="name" placeholder="Your name"></div>
+            <div class="field"><label for="email">Email</label><input id="email" type="email" placeholder="you@example.com"></div>
+          </div>
+          <button class="btn compact" type="submit">Save</button>
+        </form>
+
+        <div id="bookings">
+          <div class="section-title"><h2>My bookings</h2></div>
+          <div class="segmented" id="bFilter" role="group" aria-label="Filter bookings" style="margin-top:10px">
+            <button type="button" aria-pressed="true" data-f="up">Confirmed</button>
+            <button type="button" aria-pressed="false" data-f="cancel">Cancelled</button>
+            <button type="button" aria-pressed="false" data-f="all">All</button>
+          </div>
+          <div class="stack" id="bList" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="stack" style="gap:16px">
+        <div class="section-title"><h2>My ring</h2></div>
+        <div class="card dark" style="display:flex;align-items:center;gap:16px">
+          <svg width="64" height="64" viewBox="0 0 72 72" aria-hidden="true" style="flex:none"><circle cx="36" cy="38" r="24" fill="none" stroke="#60C1E5" stroke-width="9"/><rect x="26" y="8" width="20" height="12" rx="4" fill="#005A9C" stroke="#A0E0EF" stroke-width="2"/><circle cx="41" cy="14" r="2" fill="#60C1E5"/></svg>
+          <div style="flex:1"><p class="strong" style="font-size:18px">TravelU Ring</p><p class="small on-dark" id="ringStatus"></p></div>
+          <button class="btn compact secondary" type="button" id="pairBtn"></button>
+        </div>
+        <div class="card" id="ringFns"></div>
+        <div class="card">
+          <p class="small strong muted" style="margin-bottom:4px">Buzz patterns · tap to test</p>
+          <div class="setting"><div><p class="strong">Vote opened</p></div><span class="buzz"><span class="long"></span></span><button class="btn secondary compact" type="button" data-test="one long buzz">Test</button></div>
+          <div class="setting"><div><p class="strong">Task due</p></div><span class="buzz"><span></span><span></span></span><button class="btn secondary compact" type="button" data-test="two short buzzes">Test</button></div>
+          <div class="setting"><div><p class="strong">Gate change</p></div><span class="buzz"><span></span><span></span><span></span></span><button class="btn secondary compact" type="button" data-test="three short buzzes">Test</button></div>
+          <div class="setting">
+            <i data-icon="moon"></i><div><p class="strong">Quiet hours</p><p class="small muted">Gate changes still buzz</p></div>
+            <label class="sr-only" for="qFrom">From</label><input id="qFrom" type="time" style="height:40px;border:1.5px solid var(--line);border-radius:10px;font:inherit;padding:0 6px">
+            <label class="sr-only" for="qTo">To</label><input id="qTo" type="time" style="height:40px;border:1.5px solid var(--line);border-radius:10px;font:inherit;padding:0 6px">
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Privacy and sharing</h2></div>
+        <div class="card" id="privacy"></div>
+
+        <div class="section-title"><h2>Demo</h2></div>
+        <div class="card">
+          <p class="small muted">Everything is saved in this browser only. Reset to start the prototype from zero.</p>
+          <button class="btn danger compact" type="button" id="reset" style="margin-top:10px">Reset all data</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  // ---- profile ----
+  function drawProfile() {
+    const n = getName()
+    $('#av').textContent = initial(n)
+    $('#pName').textContent = n || 'Add your name'
+    $('#pInfo').textContent = plural(getTrips().length, 'trip') + ' · ' + plural(getBookings().filter(b => b.status === 'Confirmed').length, 'booking')
+    $('#name').value = n
+    $('#email').value = store.get('email', '')
+  }
+  $('#profile').addEventListener('submit', e => {
+    e.preventDefault()
+    const old = getName()
+    setName($('#name').value)
+    store.set('email', $('#email').value.trim())
+    // rename "you" inside trips too, or votes would break
+    const trips = getTrips()
+    trips.forEach(t => {
+      const me = t.members.find(m => m.you)
+      if (me) me.name = getName() || 'You'
+      t.saved.forEach(s => { if (s.votes && s.votes[old || 'You']) { delete s.votes[old || 'You']; s.votes[getName() || 'You'] = true } })
+    })
+    saveTrips(trips)
+    toast('Saved')
+    drawProfile()
+  })
+
+  // ---- bookings ----
+  const typeIcon = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+  let bf = 'up', armed = ''
+  $('#bFilter').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (!b) return
+    bf = b.dataset.f
+    $$('#bFilter button').forEach(x => x.setAttribute('aria-pressed', x === b))
+    drawBookings()
+  })
+
+  function drawBookings() {
+    let list = getBookings().slice().reverse()
+    if (bf === 'up') list = list.filter(b => b.status === 'Confirmed')
+    if (bf === 'cancel') list = list.filter(b => b.status === 'Cancelled')
+    $('#bList').innerHTML = list.length ? list.map(b => {
+      const trip = getTrip(b.tripId)
+      return `<div class="card" style="padding:12px 14px">
+        <div class="person"><span class="icon-tile sm">${icon(typeIcon[b.type] || 'ticket')}</span>
+          <div><p class="strong">${esc(b.title)}</p><p class="small muted">${b.date ? fmtDate(b.date, true) + ' · ' : ''}${b.code}</p></div>
+          <p class="strong">${money(b.total)}</p></div>
+        <details class="more-info"><summary>Details ${icon('down', 'sm')}</summary>
+          <div class="terms">
+            <div><p class="label">What</p><p>${esc(b.sub)}</p></div>
+            <div><p class="label">Travellers</p><p>${b.names.map(esc).join(', ')}</p></div>
+            <div><p class="label">Paid with</p><p>${esc(b.pay)} (demo)</p></div>
+            <div><p class="label">Trip</p><p>${trip ? '<a href="Trip.html?id=' + trip.id + '">' + esc(trip.name) + '</a>' : 'Not part of a trip'}</p></div>
+          </div>
+        </details>
+        <div class="card-actions">
+          ${b.status === 'Cancelled' ? flag('Cancelled') : `${!trip && getTrips().length ? `<button class="btn secondary compact" type="button" data-move="${b.bookingId}">Add to trip</button>` : ''}
+          <button class="btn danger compact" type="button" data-cancel="${b.bookingId}">${armed === b.bookingId ? 'Tap again to cancel' : 'Cancel booking'}</button>`}
+        </div>
+      </div>`
+    }).join('') : `<div class="empty small">${bf === 'cancel' ? 'No cancelled bookings.' : 'No bookings yet. <a href="Flights.html">Book a flight</a> or <a href="Accomdations.html">a stay</a>.'}</div>`
+  }
+
+  $('#bList').addEventListener('click', e => {
+    const c = e.target.closest('[data-cancel]')
+    if (c) {
+      // first tap arms it, second tap cancels (so you don't cancel by accident)
+      if (armed !== c.dataset.cancel) { armed = c.dataset.cancel; return drawBookings() }
+      const all = getBookings()
+      all.find(b => b.bookingId === c.dataset.cancel).status = 'Cancelled'
+      store.set('bookings', all)
+      armed = ''
+      toast('Booking cancelled')
+      drawBookings(); drawProfile()
+    }
+    const mv = e.target.closest('[data-move]')
+    if (mv) {
+      const m = openModal(`<div class="modal-head"><h2>Add to a trip</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+        <div class="stack">${getTrips().map(t => `<button class="row-link" type="button" data-to="${t.id}"><span class="icon-tile sm">${icon('trip')}</span><div><p class="strong">${esc(t.name)}</p></div>${icon('plus')}</button>`).join('')}</div>`)
+      m.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-to]')
+        if (!b) return
+        const all = getBookings()
+        all.find(x => x.bookingId === mv.dataset.move).tripId = b.dataset.to
+        store.set('bookings', all)
+        closeModal(); toast('Added to trip'); drawBookings()
+      })
+    }
+  })
+
+  // ---- ring ----
+  const ringDefaults = { paired: false, battery: 78, alerts: true, pay: false, nav: true, safety: false, qFrom: '23:00', qTo: '07:00' }
+  let ring = Object.assign({}, ringDefaults, store.get('ring', {}))
+  function saveRing() { store.set('ring', ring) }
+
+  function drawRing() {
+    $('#ringStatus').textContent = ring.paired ? 'Connected · battery ' + ring.battery + '%' : 'Not connected'
+    $('#pairBtn').textContent = ring.paired ? 'Disconnect' : 'Connect'
+    const fns = [
+      ['alerts', 'bell', 'Trip alerts', 'Votes, tasks due, gate changes'],
+      ['pay', 'card', 'Contactless payment', 'Linked card · $50 limit per payment'],
+      ['nav', 'nav', 'Navigation cues', 'Buzz for left, right and arrival'],
+      ['safety', 'shield', 'Group safety', 'Off by default · trip members only']
+    ]
+    $('#ringFns').innerHTML = fns.map(([k, ic, t, s]) => `<div class="setting">${icon(ic)}<div><p class="strong">${t}</p><p class="small muted">${s}</p></div>
+      <button class="switch" type="button" data-ring="${k}" aria-pressed="${ring[k]}" aria-label="${t}" ${ring.paired ? '' : 'disabled'}></button></div>`).join('') +
+      (ring.paired ? '' : '<p class="small muted" style="padding-top:8px">Connect your ring to change these.</p>')
+    $('#qFrom').value = ring.qFrom
+    $('#qTo').value = ring.qTo
+  }
+  $('#pairBtn').addEventListener('click', () => {
+    if (ring.paired) { ring.paired = false; saveRing(); drawRing(); return }
+    // pretend bluetooth pairing takes a second
+    $('#pairBtn').disabled = true
+    $('#ringStatus').textContent = 'Looking for your ring…'
+    setTimeout(() => {
+      ring.paired = true
+      saveRing()
+      $('#pairBtn').disabled = false
+      drawRing()
+      toast('Ring connected')
+    }, 1200)
+  })
+  $('#ringFns').addEventListener('click', e => {
+    const s = e.target.closest('[data-ring]')
+    if (!s) return
+    ring[s.dataset.ring] = !ring[s.dataset.ring]
+    saveRing(); drawRing()
+  })
+  $$('[data-test]').forEach(b => b.addEventListener('click', () => toast(ring.paired ? 'Ring: ' + b.dataset.test : 'Connect your ring first')))
+  $('#qFrom').addEventListener('change', () => { ring.qFrom = $('#qFrom').value; saveRing() })
+  $('#qTo').addEventListener('change', () => { ring.qTo = $('#qTo').value; saveRing() })
+
+  // ---- privacy ----
+  let priv = Object.assign({ location: false, options: true, docs: false }, store.get('privacy', {}))
+  function drawPrivacy() {
+    const rows = [
+      ['location', 'pin', 'Share my location', 'Only with people on my trips'],
+      ['options', 'eye', 'People see what I save', 'Needed for group voting'],
+      ['docs', 'lock', 'Keep passport copy on this device', 'Never uploaded']
+    ]
+    $('#privacy').innerHTML = rows.map(([k, ic, t, s]) => `<div class="setting">${icon(ic)}<div><p class="strong">${t}</p><p class="small muted">${s}</p></div>
+      <button class="switch" type="button" data-priv="${k}" aria-pressed="${priv[k]}" aria-label="${t}"></button></div>`).join('')
+  }
+  $('#privacy').addEventListener('click', e => {
+    const s = e.target.closest('[data-priv]')
+    if (!s) return
+    priv[s.dataset.priv] = !priv[s.dataset.priv]
+    store.set('privacy', priv)
+    drawPrivacy()
+  })
+
+  $('#reset').addEventListener('click', () => {
+    if (!confirm('Delete all trips, bookings and settings in this browser?')) return
+    Object.keys(localStorage).filter(k => k.startsWith('tu_')).forEach(k => localStorage.removeItem(k))
+    location.href = 'Home.html'
+  })
+
+  drawProfile(); drawBookings(); drawRing(); drawPrivacy()
+  if (location.hash === '#bookings') $('#bookings').scrollIntoView()
+</script>
+</body>
+</html>

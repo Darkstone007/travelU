@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Home · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+</head>
+<body data-tab="home">
+<div class="app">
+  <header class="page-head">
+    <div>
+      <h1 id="hello">Hi there</h1>
+      <p class="muted" id="today" style="margin-top: 4px"></p>
+    </div>
+    <a class="icon-btn filled" href="Account.html" aria-label="Account"><i data-icon="user"></i></a>
+  </header>
+
+  <main class="screen">
+    <!-- only shows if we don't know their name yet -->
+    <form class="card tint stack" id="nameForm" hidden>
+      <label for="nameInput" class="strong">What should we call you?</label>
+      <div class="inline-form">
+        <input id="nameInput" placeholder="Your first name" required>
+        <button class="btn compact" type="submit">Save</button>
+      </div>
+    </form>
+
+    <div class="quick">
+      <a href="Flights.html"><i data-icon="plane"></i>Flights</a>
+      <a href="Accomdations.html"><i data-icon="bed"></i>Stays</a>
+      <a href="Activities.html"><i data-icon="ticket"></i>Things to do</a>
+      <a href="index.html"><i data-icon="plus"></i>New trip</a>
+    </div>
+
+    <div class="section-title"><h2>Your trips</h2><a class="small strong" href="index.html">New trip</a></div>
+    <div id="trips" class="stack"></div>
+
+    <div id="attentionBox" hidden>
+      <div class="section-title"><h2>Needs your attention</h2></div>
+      <div id="attention" class="stack" style="margin-top: 10px"></div>
+    </div>
+
+    <div class="section-title"><h2>Upcoming bookings</h2><a class="small strong" href="Account.html#bookings">See all</a></div>
+    <div id="bookings" class="stack"></div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  // greeting
+  const name = getName()
+  $('#hello').textContent = name ? 'Hi ' + name : 'Hi there'
+  $('#today').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  if (!name) $('#nameForm').hidden = false
+  $('#nameForm').addEventListener('submit', e => {
+    e.preventDefault()
+    setName($('#nameInput').value)
+    location.reload()
+  })
+
+  // ---- trips ----
+  const trips = getTrips().sort((a, b) => (a.leave || '9') < (b.leave || '9') ? -1 : 1)
+
+  function passCard(t) {
+    const from = getCity(t.from), to = getCity(t.to)
+    const steps = tripProgress(t)
+    const now = steps.findIndex(s => !s[1])
+    let dots = ''
+    steps.forEach(([label, done], i) => {
+      const cls = done ? 'done' : i === now ? 'now' : ''
+      dots += `<li class="${cls}"><span class="mark">${done ? icon('check', 'sm') : ''}</span>${label}</li>`
+    })
+    return `<a class="pass" href="Trip.html?id=${t.id}">
+      <div class="pass-top">
+        <div class="split small on-dark strong"><span>${esc(t.name)}</span><span>${t.leave && t.ret ? plural(nightsBetween(t.leave, t.ret), 'night') : ''}</span></div>
+        <div class="pass-route">
+          <div><p class="code">${t.from || '---'}</p><p class="small on-dark">${from ? from.name : 'Anywhere'}</p></div>
+          <div class="pass-line"><span></span>${icon('plane')}<span></span></div>
+          <div style="text-align:right"><p class="code">${t.to || '---'}</p><p class="small on-dark">${to ? to.name : 'Not decided'}</p></div>
+        </div>
+        <div class="pass-facts">
+          <div><p class="tiny">Dates</p><p>${t.leave ? fmtDate(t.leave) + '–' + fmtDate(t.ret) : 'Not set'}</p></div>
+          <div><p class="tiny">People</p><p>${t.members.length}</p></div>
+          <div><p class="tiny">Budget</p><p>${t.budget ? money(t.budget) + ' each' : 'Not set'}</p></div>
+        </div>
+      </div>
+      <div class="perf"></div>
+      <div class="pass-bottom">
+        <ol class="steps">${dots}</ol>
+        <p class="small" style="margin:12px 8px 0">Step ${now === -1 ? 5 : now + 1} of 5 · ${now === -1 ? 'All booked' : steps[now][0] + ' next'}</p>
+      </div>
+    </a>`
+  }
+
+  if (!trips.length) {
+    $('#trips').innerHTML = `<div class="empty">
+      <p class="strong" style="color:var(--navy)">No trips yet</p>
+      <p class="small" style="margin:4px 0 12px">You don't need one to book. Make a trip if you're planning with friends and want to compare, vote and split costs.</p>
+      <a class="btn compact" href="index.html" style="display:inline-flex">Start a trip</a>
+    </div>`
+  } else {
+    // first trip gets the big card, the rest are rows
+    let html = passCard(trips[0])
+    trips.slice(1).forEach(t => {
+      html += `<a class="row-link" href="Trip.html?id=${t.id}"><span class="icon-tile sm">${icon('pin')}</span><div><p class="strong">${esc(t.name)}</p><p class="small muted">${t.leave ? fmtDate(t.leave) + ' – ' + fmtDate(t.ret) : 'No dates yet'} · ${plural(t.saved.length, 'option')} saved</p></div>${icon('next')}</a>`
+    })
+    $('#trips').innerHTML = html
+  }
+
+  // ---- things to sort out ----
+  let todo = ''
+  trips.forEach(t => {
+    const left = t.checklist.filter(c => !c.done)
+    if (left.length) {
+      todo += `<a class="alert-row warn" href="Visa.html?trip=${t.id}">${icon('alert')}<div><p class="strong">${esc(left[0].text)}</p><p class="small">${esc(t.name)} · ${plural(left.length, 'task')} left</p></div>${icon('next')}</a>`
+    }
+    const me = getName() || 'You'
+    const notVoted = t.saved.filter(s => !(s.votes || {})[me]).length
+    if (t.saved.length && notVoted) {
+      todo += `<a class="alert-row" href="Group.html?trip=${t.id}">${icon('vote')}<div><p class="strong">You haven't voted on ${plural(notVoted, 'option')}</p><p class="small muted">${esc(t.name)}</p></div>${icon('next')}</a>`
+    }
+  })
+  if (todo) {
+    $('#attentionBox').hidden = false
+    $('#attention').innerHTML = todo
+  }
+
+  // ---- bookings ----
+  const upcoming = getBookings().filter(b => b.status === 'Confirmed').sort((a, b) => (a.date || '') < (b.date || '') ? -1 : 1).slice(0, 4)
+  const icons = { flight: 'plane', stay: 'bed', tour: 'guide', activity: 'ticket', package: 'box', transport: 'bus' }
+  $('#bookings').innerHTML = upcoming.length
+    ? upcoming.map(b => `<a class="row-link" href="Account.html#bookings"><span class="icon-tile sm">${icon(icons[b.type] || 'ticket')}</span><div><p class="strong">${esc(b.title)}</p><p class="small muted">${b.date ? fmtDate(b.date, true) + ' · ' : ''}${b.code}</p></div>${icon('next')}</a>`).join('')
+    : '<div class="empty small">Nothing booked yet. Book a flight or a stay, no trip needed.</div>'
+</script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Map · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="trip">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="javascript:history.back()" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Map</h1><p class="sub">Tap a pin to see it and book</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="field"><label for="city">City</label><select id="city"></select></div>
+    <div class="chips" role="group" aria-label="Show on map">
+      <button type="button" class="chip" aria-pressed="true" data-layer="stay">Stays</button>
+      <button type="button" class="chip" aria-pressed="true" data-layer="activity">Things to do</button>
+      <button type="button" class="chip" aria-pressed="false" data-layer="mine">Only my saved and booked</button>
+    </div>
+
+    <div class="two-col">
+      <div class="map-wrap" id="map"></div>
+      <div class="stack">
+        <div id="info"></div>
+        <div class="stack" id="pinList" style="max-height:420px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <p class="note">Drawn map for the prototype, not a real street map.</p>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const trip = getTrip(param('trip'))
+  fillCities($('#city'), 'Choose a city', false)
+  $('#city').value = param('city') || (trip && trip.to) || ''
+
+  // dates used for stay prices on the map
+  const cin = trip && trip.leave ? trip.leave : addDays(todayISO(), 30)
+  const cout = trip && trip.ret ? trip.ret : addDays(cin, 4)
+
+  let pins = [], current = ''
+
+  $('.chips').addEventListener('click', e => {
+    const c = e.target.closest('.chip')
+    if (!c) return
+    c.setAttribute('aria-pressed', c.getAttribute('aria-pressed') !== 'true')
+    draw()
+  })
+
+  function mySavedIds() {
+    const ids = getBookings().map(b => b.id)
+    getTrips().forEach(t => t.saved.forEach(s => ids.push(s.id)))
+    return ids
+  }
+
+  function draw() {
+    const code = $('#city').value
+    const city = getCity(code)
+    if (!city) {
+      $('#map').innerHTML = '<div class="empty" style="border:0">Choose a city to see the map.</div>'
+      $('#pinList').innerHTML = ''; $('#info').innerHTML = ''
+      return
+    }
+    const on = l => $(`[data-layer=${l}]`).getAttribute('aria-pressed') === 'true'
+    const mine = mySavedIds()
+    const r = seeded('map' + code)
+
+    // where each area sits on the map (4 corners-ish)
+    const spots = [[95, 80], [300, 75], [110, 220], [305, 225]]
+
+    pins = []
+    if (on('stay')) genStays(code, cin, cout, 2).forEach(s => pins.push({ id: s.id, kind: 'stay', title: s.name, sub: s.kind + ' · ' + money(s.night) + '/night · ' + s.rating + '★', area: s.area, raw: s }))
+    if (on('activity')) genActivities(code).forEach(a => pins.push({ id: a.id, kind: 'activity', title: a.title, sub: a.cat + ' · ' + (a.pp ? money(a.pp) + ' each' : 'Free'), area: a.area, raw: a }))
+    if (on('mine')) pins = pins.filter(p => mine.includes(p.id))
+
+    pins.forEach(p => {
+      const i = Math.max(0, city.areas.indexOf(p.area))
+      const pr = seeded(p.id)
+      p.x = spots[i][0] + (pr() - 0.5) * 120
+      p.y = spots[i][1] + (pr() - 0.5) * 80
+      p.mine = mine.includes(p.id)
+    })
+
+    // the map: water, parks, streets, then labels, then pins
+    let svg = `<svg viewBox="0 0 400 300" role="img" aria-label="Map of ${city.name}">
+      <rect width="400" height="300" fill="#F4FAFD"/>`
+    for (let x = 20; x < 400; x += 38) svg += `<path d="M${x} 0V300" stroke="#E2EEF4" stroke-width="${r() < 0.2 ? 5 : 2}"/>`
+    for (let y = 18; y < 300; y += 34) svg += `<path d="M0 ${y}H400" stroke="#E2EEF4" stroke-width="${r() < 0.2 ? 5 : 2}"/>`
+    const wx = 150 + r() * 100
+    svg += `<path d="M${wx} -10 C ${wx - 60} 80, ${wx + 80} 160, ${wx - 20} 310" fill="none" stroke="#A0E0EF" stroke-width="24" stroke-linecap="round"/>`
+    svg += `<rect x="${20 + r() * 60}" y="${120 + r() * 40}" width="70" height="44" rx="10" fill="#DDF5E5"/>`
+    svg += `<rect x="${260 + r() * 60}" y="${130 + r() * 30}" width="54" height="40" rx="10" fill="#DDF5E5"/>`
+    city.areas.forEach((a, i) => {
+      svg += `<text x="${spots[i][0]}" y="${spots[i][1] - 48}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5B70" font-family="Plus Jakarta Sans, sans-serif">${esc(a)}</text>`
+    })
+    pins.forEach(p => {
+      const col = p.mine ? '#1B365D' : p.kind === 'stay' ? '#005A9C' : '#60C1E5'
+      svg += `<g class="map-pin ${p.id === current ? 'on' : ''}" tabindex="0" role="button" aria-label="${esc(p.title)}" data-pin="${p.id}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})">
+        <circle r="${p.mine ? 9 : 7}" fill="${col}" stroke="#fff" stroke-width="2"/></g>`
+    })
+    svg += '</svg>'
+    $('#map').innerHTML = svg
+
+    $('#pinList').innerHTML = pins.length ? pins.map(p => `<button class="row-link" type="button" data-pin="${p.id}" style="text-align:left;font:inherit;cursor:pointer">
+      <span class="icon-tile sm">${icon(p.kind === 'stay' ? 'bed' : 'ticket')}</span><div><p class="strong">${esc(p.title)}${p.mine ? ' ★' : ''}</p><p class="small muted">${esc(p.area)} · ${esc(p.sub)}</p></div></button>`).join('')
+      : '<div class="empty small">Nothing to show. Turn on a layer above.</div>'
+    showInfo()
+  }
+
+  function showInfo() {
+    const p = pins.find(x => x.id === current)
+    if (!p) { $('#info').innerHTML = '<p class="small muted">Dark pins are things you saved or booked.</p>'; return }
+    $('#info').innerHTML = `<div class="card tint">
+      <p class="tiny strong muted">${p.kind === 'stay' ? 'Stay' : 'Thing to do'} · ${esc(p.area)}</p>
+      <h3>${esc(p.title)}</h3><p class="small muted">${esc(p.sub)}</p>
+      <div class="card-actions">
+        <a class="btn secondary compact" href="Transport.html?${trip ? 'trip=' + trip.id : ''}">${icon('nav', 'sm')} Getting there</a>
+        <button class="btn secondary compact" type="button" data-action="save" data-id="${p.id}">Save</button>
+        ${p.kind === 'stay' || p.raw.pp ? `<button class="btn compact" type="button" data-action="book" data-id="${p.id}" ${isBooked(p.id) ? 'disabled' : ''}>${isBooked(p.id) ? 'Booked' : 'Book'}</button>` : ''}
+      </div></div>`
+  }
+
+  function selectPin(id) { current = id; draw() }
+  $('#map').addEventListener('click', e => { const g = e.target.closest('[data-pin]'); if (g) selectPin(g.dataset.pin) })
+  $('#map').addEventListener('keydown', e => { const g = e.target.closest('[data-pin]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectPin(g.dataset.pin) } })
+  $('#pinList').addEventListener('click', e => { const b = e.target.closest('[data-pin]'); if (b) selectPin(b.dataset.pin) })
+
+  wireCardActions($('#info'), id => (pins.find(p => p.id === id) || {}).raw, raw => raw.type === 'stay' ? summarize(raw) : summarize({
+    type: 'activity', id: raw.id, title: raw.title, sub: raw.area + ' · ' + raw.hours + 'h', total: raw.pp, people: 1, city: raw.city
+  }, { needDate: true }))
+
+  $('#city').addEventListener('change', () => { current = ''; draw() })
+  draw()
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Compare · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="trip">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="javascript:history.back()" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Compare</h1><p class="sub">Tick "Compare" on up to 3 flights or stays</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="segmented" id="tabs" role="group" aria-label="What to compare">
+      <button type="button" data-t="flight" aria-pressed="true">Flights <span id="nf"></span></button>
+      <button type="button" data-t="stay" aria-pressed="false">Stays <span id="ns"></span></button>
+    </div>
+
+    <div id="summary"></div>
+    <div class="scroll-x"><div id="table"></div></div>
+
+    <div class="btn-row" id="bottomBtns">
+      <button class="btn secondary" type="button" id="saveAll"><i data-icon="trip" class="sm"></i>Save all to a trip</button>
+      <button class="btn danger" type="button" id="clearAll">Clear list</button>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  let type = param('type') === 'stay' ? 'stay' : 'flight'
+
+  function setTab(t) {
+    type = t
+    $$('#tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t))
+    draw()
+  }
+  $('#tabs').addEventListener('click', e => {
+    const b = e.target.closest('button')
+    if (b) setTab(b.dataset.t)
+  })
+
+  // which item wins a row. returns the index or -1 if it's a tie / not useful
+  function bestIndex(vals, lowWins = true) {
+    if (vals.length < 2) return -1
+    const best = lowWins ? Math.min(...vals) : Math.max(...vals)
+    const hits = vals.filter(v => v === best).length
+    return hits === 1 ? vals.indexOf(best) : -1
+  }
+
+  function draw() {
+    const c = getCompare()
+    $('#nf').textContent = c.flight.length ? '(' + c.flight.length + ')' : ''
+    $('#ns').textContent = c.stay.length ? '(' + c.stay.length + ')' : ''
+    const items = c[type]
+
+    if (!items.length) {
+      $('#table').innerHTML = `<div class="empty">Nothing to compare yet.<br><a href="${type === 'flight' ? 'Flights.html' : 'Accomdations.html'}">Search ${type === 'flight' ? 'flights' : 'stays'}</a> and tick "Compare".</div>`
+      $('#summary').innerHTML = ''
+      $('#bottomBtns').hidden = true
+      return
+    }
+    $('#bottomBtns').hidden = false
+
+    let rows
+    if (type === 'flight') {
+      const price = items.map(f => f.total + f.bagFee * f.pax)
+      const dur = items.map(f => f.out.dur + (f.back ? f.back.dur : 0))
+      rows = [
+        ['Route', items.map(f => f.from + ' → ' + f.to + '<br><span class="small muted">' + fmtDate(f.leave) + (f.ret ? ' – ' + fmtDate(f.ret) : '') + '</span>'), -1],
+        ['Total', price.map((p, i) => money(p) + (items[i].bag === 'unknown' ? ' + bag' : '')), bestIndex(price)],
+        ['Each', items.map(f => money(f.pp)), -1],
+        ['Leaves', items.map(f => f.out.dep + ' → ' + f.out.arr + (f.out.plusDays ? '+' + f.out.plusDays : '')), -1],
+        ['Flying time', dur.map(durText), bestIndex(dur)],
+        ['Stops', items.map(f => stopsText(f.stops)), bestIndex(items.map(f => f.stops))],
+        ['Bag', items.map(f => f.bag === 'included' ? 'Included' : f.bag === 'fee' ? '+' + money(f.bagFee) + ' each' : '<span class="warn-text">Not confirmed</span>'), -1],
+        ['If plans change', items.map(f => f.cancel), bestIndex(items.map(f => f.fare === 'Flex' ? 0 : f.fare === 'Standard' ? 1 : 2))],
+        ['Seller', items.map(f => f.seller), -1]
+      ]
+      // plain words summary
+      const cheap = items[price.indexOf(Math.min(...price))]
+      const fast = items[dur.indexOf(Math.min(...dur))]
+      let txt = `<b>${cheap.airline}</b> is cheapest`
+      if (fast !== cheap) txt += `, <b>${fast.airline}</b> is fastest by ${durText(Math.max(...dur) - Math.min(...dur))}`
+      txt += `. Difference between the cheapest and most expensive: ${money(Math.max(...price) - Math.min(...price))}.`
+      $('#summary').innerHTML = `<div class="card tint" style="display:flex;gap:10px">${icon('info')}<p class="small">${txt}</p></div>`
+    } else {
+      const totals = items.map(s => s.total)
+      rows = [
+        ['Where', items.map(s => s.kind + ', ' + s.area + '<br><span class="small muted">' + getCity(s.city).name + '</span>'), -1],
+        ['Total', items.map(s => money(s.total) + (s.tax === 'unknown' ? ' + tax' : '')), bestIndex(totals)],
+        ['Per night', items.map(s => money(s.night)), bestIndex(items.map(s => s.night))],
+        ['Rating', items.map(s => s.rating + ' / 5'), bestIndex(items.map(s => s.rating), false)],
+        ['To centre', items.map(s => s.km + ' km'), bestIndex(items.map(s => s.km))],
+        ['Taxes', items.map(s => s.tax === 'included' ? 'Included' : s.tax === 'extra' ? money(s.taxAmount) + ' extra' : '<span class="warn-text">Unknown</span>'), -1],
+        ['If plans change', items.map(s => s.cancel), bestIndex(items.map(s => s.freeCancel ? 0 : 1))],
+        ['Has', items.map(s => s.amen.join(', ') || 'Basics'), -1]
+      ]
+      const cheap = items[totals.indexOf(Math.min(...totals))]
+      const top = items.slice().sort((a, b) => b.rating - a.rating)[0]
+      let txt = `<b>${esc(cheap.name)}</b> is cheapest overall`
+      if (top !== cheap) txt += `, <b>${esc(top.name)}</b> has the best rating (${top.rating})`
+      $('#summary').innerHTML = `<div class="card tint" style="display:flex;gap:10px">${icon('info')}<p class="small">${txt}.</p></div>`
+    }
+
+    let html = '<table class="cmp-table"><thead><tr><th></th>'
+    items.forEach(it => { html += `<th>${esc(type === 'flight' ? it.airline : it.name)}</th>` })
+    html += '</tr></thead><tbody>'
+    rows.forEach(([label, vals, best]) => {
+      html += `<tr><th scope="row">${label}</th>`
+      vals.forEach((v, i) => { html += `<td class="${i === best ? 'best' : ''}">${v}${i === best ? ' ✓' : ''}</td>` })
+      html += '</tr>'
+    })
+    html += '<tr><th></th>'
+    items.forEach(it => {
+      html += `<td><div class="stack">
+        <button class="btn compact" type="button" data-action="book" data-id="${it.id}" ${isBooked(it.id) ? 'disabled' : ''}>${isBooked(it.id) ? 'Booked' : 'Book'}</button>
+        <button class="btn secondary compact" type="button" data-action="save" data-id="${it.id}">Save to trip</button>
+        <button class="link-btn small" type="button" data-remove="${it.id}">Remove</button></div></td>`
+    })
+    html += '</tr></tbody></table>'
+    $('#table').innerHTML = html
+  }
+
+  wireCardActions($('#table'), id => getCompare()[type].find(x => x.id === id))
+  $('#table').addEventListener('click', e => {
+    const r = e.target.closest('[data-remove]')
+    if (!r) return
+    toggleCompare(getCompare()[type].find(x => x.id === r.dataset.remove))
+    draw()
+  })
+
+  $('#clearAll').addEventListener('click', () => {
+    const c = getCompare()
+    c[type] = []
+    store.set('compare', c)
+    draw()
+  })
+
+  // saves every item in the table to one trip, so the group can vote
+  $('#saveAll').addEventListener('click', () => {
+    const trips = getTrips()
+    if (!trips.length) {
+      openModal(`<div class="modal-head"><h2>No trips yet</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+        <p class="small muted">Make a trip first, then you can send these options to your group to vote on.</p>
+        <a class="btn" style="margin-top:14px" href="index.html">Start a trip</a>`)
+      return
+    }
+    const m = openModal(`<div class="modal-head"><h2>Save all to</h2><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      <div class="stack">${trips.map(t => `<button class="row-link" type="button" data-trip="${t.id}"><span class="icon-tile sm">${icon('trip')}</span><div><p class="strong">${esc(t.name)}</p></div>${icon('plus')}</button>`).join('')}</div>`)
+    m.addEventListener('click', e => {
+      const b = e.target.closest('[data-trip]')
+      if (!b) return
+      getCompare()[type].forEach(it => addToTrip(b.dataset.trip, summarize(it)))
+      closeModal()
+      toast('Saved. Your group can vote on them now')
+    })
+  })
+
+  setTab(type)
+</script>
+</body>
+</html>

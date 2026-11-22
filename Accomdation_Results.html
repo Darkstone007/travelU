@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Stay results · TravelU</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="menu.css">
+  <link rel="stylesheet" href="filter.css">
+</head>
+<body data-tab="plan">
+<div class="app wide">
+  <header class="top">
+    <a class="icon-btn" href="Accomdations.html" aria-label="Back"><i data-icon="back" class="lg"></i></a>
+    <div><h1>Stay results</h1><p class="sub">Prices are for the whole stay</p></div>
+  </header>
+
+  <main class="screen">
+    <div class="search-bar">
+      <i data-icon="bed"></i>
+      <div><p class="strong" id="sumCity"></p><p class="small" id="sumInfo"></p></div>
+      <a class="small strong" id="editLink" href="Accomdations.html">Edit</a>
+    </div>
+
+    <div class="segmented" aria-label="View">
+      <a href="#" aria-current="page">List</a>
+      <a href="Maps.html" id="mapLink">Map</a>
+    </div>
+
+    <div class="results-layout">
+      <details class="filters" id="filterBox">
+        <summary>Filters <i data-icon="down" class="sm"></i></summary>
+        <div class="form">
+          <div class="field">
+            <span class="label">Type</span>
+            <label class="check-row"><input type="checkbox" name="kind" value="Hotel"> Hotel</label>
+            <label class="check-row"><input type="checkbox" name="kind" value="Hostel"> Hostel</label>
+            <label class="check-row"><input type="checkbox" name="kind" value="Apartment"> Apartment</label>
+            <label class="check-row"><input type="checkbox" name="kind" value="Guesthouse"> Guesthouse</label>
+          </div>
+          <div class="field">
+            <label for="maxNight">Max per night: <span id="maxLabel"></span></label>
+            <input type="range" id="maxNight" step="5">
+          </div>
+          <div class="field">
+            <label for="minRating">Rating</label>
+            <select id="minRating">
+              <option value="0">Any</option><option value="4">4.0+</option><option value="4.5">4.5+</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="maxKm">Distance from centre</label>
+            <select id="maxKm">
+              <option value="99">Any</option><option value="1">Under 1 km</option><option value="3">Under 3 km</option><option value="5">Under 5 km</option>
+            </select>
+          </div>
+          <div class="field">
+            <span class="label">Must have</span>
+            <label class="check-row"><input type="checkbox" id="freeOnly"> Free cancellation</label>
+            <label class="check-row"><input type="checkbox" id="taxOnly"> Taxes included</label>
+            <label class="check-row"><input type="checkbox" id="hideUnknown"> Hide unconfirmed costs</label>
+            <label class="check-row"><input type="checkbox" name="amen" value="Breakfast"> Breakfast</label>
+            <label class="check-row"><input type="checkbox" name="amen" value="Kitchen"> Kitchen</label>
+            <label class="check-row"><input type="checkbox" name="amen" value="Pool"> Pool</label>
+            <label class="check-row"><input type="checkbox" name="amen" value="Airport shuttle"> Airport shuttle</label>
+          </div>
+          <button type="button" class="btn secondary compact" id="resetFilters">Reset filters</button>
+        </div>
+      </details>
+
+      <div class="stack">
+        <div class="count-line">
+          <p class="small strong" id="count"></p>
+          <label class="small strong">Sort
+            <select id="sort">
+              <option value="price">Lowest total</option>
+              <option value="rating">Best rated</option>
+              <option value="km">Closest to centre</option>
+            </select>
+          </label>
+        </div>
+        <div class="result-list" id="list"></div>
+        <p class="note">Sample stays. Names, ratings and prices are made up for the prototype.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<a class="compare-bar" id="compareBar" href="Compare.html?type=stay" hidden><span>Compare</span><i data-icon="next"></i></a>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="booking.js"></script>
+<script>
+  const city = param('city'), checkin = param('in'), checkout = param('out')
+  const guests = Number(param('guests')) || 2
+  const wanted = param('types') ? param('types').split(',') : ['Hotel', 'Hostel', 'Apartment', 'Guesthouse']
+
+  if (!city || !getCity(city) || !checkin) {
+    $('.results-layout').innerHTML = '<div class="empty">No search yet. <a href="Accomdations.html">Search for stays</a></div>'
+  } else {
+    const stays = genStays(city, checkin, checkout, guests)
+    $('#sumCity').textContent = getCity(city).name
+    $('#sumInfo').textContent = fmtDate(checkin) + ' – ' + fmtDate(checkout) + ' · ' + plural(stays[0].nights, 'night') + ' · ' + plural(guests, 'guest')
+    $('#editLink').href = 'Accomdations.html?' + location.search.slice(1)
+    $('#mapLink').href = 'Maps.html?city=' + city
+    if (window.innerWidth >= 960) $('#filterBox').open = true
+
+    $$('input[name=kind]').forEach(c => { c.checked = wanted.includes(c.value) })
+    const maxN = Math.ceil(Math.max(...stays.map(s => s.night)) / 5) * 5
+    $('#maxNight').min = Math.floor(Math.min(...stays.map(s => s.night)) / 5) * 5
+    $('#maxNight').max = maxN
+    $('#maxNight').value = maxN
+
+    function draw() {
+      $('#maxLabel').textContent = money($('#maxNight').value)
+      const kinds = $$('input[name=kind]:checked').map(i => i.value)
+      const amen = $$('input[name=amen]:checked').map(i => i.value)
+
+      let shown = stays.filter(s => {
+        if (!kinds.includes(s.kind)) return false
+        if (s.night > Number($('#maxNight').value)) return false
+        if (s.rating < Number($('#minRating').value)) return false
+        if (s.km > Number($('#maxKm').value)) return false
+        if ($('#freeOnly').checked && !s.freeCancel) return false
+        if ($('#taxOnly').checked && s.tax !== 'included') return false
+        if ($('#hideUnknown').checked && s.tax === 'unknown') return false
+        if (!amen.every(a => s.amen.includes(a))) return false
+        return true
+      })
+
+      const sort = $('#sort').value
+      shown.sort((a, b) => sort === 'rating' ? b.rating - a.rating : sort === 'km' ? a.km - b.km : a.total - b.total)
+
+      $('#count').textContent = shown.length + ' of ' + stays.length + ' stays'
+      $('#list').innerHTML = shown.length ? shown.map(stayCard).join('') : '<div class="empty">Nothing matches. Try turning off a filter.</div>'
+    }
+
+    $('#filterBox').addEventListener('input', draw)
+    $('#sort').addEventListener('change', draw)
+    $('#resetFilters').addEventListener('click', () => {
+      $$('#filterBox input[type=checkbox]').forEach(c => { c.checked = c.name === 'kind' })
+      $('#maxNight').value = maxN
+      $('#minRating').value = '0'
+      $('#maxKm').value = '99'
+      draw()
+    })
+
+    wireCardActions($('#list'), id => stays.find(s => s.id === id))
+    draw()
+    updateCompareBar()
+  }
+</script>
+</body>
+</html>
