@@ -20,4 +20,4 @@ Everything is saved in the browser (localStorage). Use **Account > Reset all dat
 - Font: Plus Jakarta Sans by Gumpita Rahayu (Tokotype), via Google Fonts: https://fonts.google.com/specimen/Plus+Jakarta+Sans
 
 ## AI use
-Code written with help from Claude (Anthropic), based on our group's design and research reports.
+Code written with the help from Claude (Anthropic) to fix and correct mistakes.
